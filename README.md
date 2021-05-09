@@ -29,16 +29,21 @@ Old Way
     if [ -d /usr/local/bin ]; then
         PATH=$PATH:/usr/local/bin
     fi
+    # This goes on for many more lines
     echo $PATH
     /home/you/bin:/usr/bin:/usr/sbin:/usr/local/bin
 
 If for some reason my profile ran twice, then my PATH would mostly duplicate.
 
+Now my .profile looks like this...
+
     PATH=`cleanpath -Pb -- "${HOME}/bin" "${HOME}/sbin"`
     export PATH
     PATH=`cleanpath -P -- "/usr/local/bin"`
     export PATH
-    echo $PATH
+
+    # Each line is longer, but there are no more lines
+    $ echo $PATH
     /home/you/bin:/usr/bin:/usr/sbin:/usr/local/bin
 
 - cleanpath -P will check each component in the PATH environment variable to
@@ -48,7 +53,21 @@ variable in the output.
 - cleanpath always removes dupliates from the combined string.
 - cleanpath always removes dupliate ':' separators from the string.
 
-## Problems on another UNIX
+## Other Environment Variables
+
+    LD_LIBRARY_PATH=`cleanpath -Pb LD_LIBRARY_PATH -- "$HOME/lib"`
+    export LD_LIBRARY_PATH
+    LD_LIBRARY_PATH=`cleanpath -P LD_LIBRARY_PATH -- "/usr/local/lib"`
+    export LD_LIBRARY_PATH
+
+## Non environment lists (different seperator)...
+
+    $ cleanpath -XF, -- abcd efgh ijkl efgh mnop abcd qrst
+    abcd,efgh,ijkl,mnop,qrst
+    $ cleanpath -XF, -- abcd,efgh ijkl,efgh,mnop abcd qrst
+    abcd,efgh,ijkl,mnop,qrst
+
+## Problems Compiling on some other UNIX
 
 There are exactly two things this needs from non-standardized hearder files:
 

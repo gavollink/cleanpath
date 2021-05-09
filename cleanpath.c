@@ -3,7 +3,7 @@
  *
  * Linux/MacOS utility to clean a colon separated ENV variable.
  */
-#define CP_VERSION "1.00.01"
+#define CP_VERSION "1.02"
 
 #include <stdio.h>          // printf
 #include <stdlib.h>         // exit, malloc, free
@@ -29,7 +29,7 @@ struct options {
     int     before;
     int     debug;
     int     sizewarn;
-    char    seperator;
+    char    delimiter;
     char    env[ARG_MAX];
     char    extra[ARG_MAX];
 };
@@ -76,16 +76,16 @@ main( int argc, char *argv[] )
                 memblk,
                 ARG_MAX
                 );
-        // Add a seperator to holdenv
-        strzcatnn( holdenv, &opts.seperator, memblk, 1 );
+        // Add a delimiter to holdenv
+        strzcatnn( holdenv, &opts.delimiter, memblk, 1 );
         // Cat requested ENV VAR onto holdenv
         strzcatn( holdenv, origenv, memblk );
     }
     else {
         // Copy requested ENV VAR into holdenv
         strzcatn( holdenv, origenv, memblk );
-        // Add a seperator to holdenv
-        strzcatnn( holdenv, &opts.seperator, memblk, 1 );
+        // Add a delimiter to holdenv
+        strzcatnn( holdenv, &opts.delimiter, memblk, 1 );
         // Concat any command-line extras into holdenv
         strzcatnn(
                 holdenv,
@@ -111,7 +111,7 @@ main( int argc, char *argv[] )
     int         statret;
     while ( out_n_i < strzlengthn(holdenv, memblk) ) {
         //memset( &statbuf, 0, sizeof(statbuf) );
-        out_n_i = strzindex(opts.seperator, holdenv, out_s_i, memblk);
+        out_n_i = strzindex(opts.delimiter, holdenv, out_s_i, memblk);
         if ( out_n_i < out_s_i ) {
             break;
         }
@@ -145,7 +145,7 @@ main( int argc, char *argv[] )
         }
         inn_n_i = inn_s_i = (out_n_i + 1);
         while ( inn_n_i < strzlengthn(holdenv, memblk) ) {
-            inn_n_i = strzindex(opts.seperator, holdenv, inn_s_i, memblk);
+            inn_n_i = strzindex(opts.delimiter, holdenv, inn_s_i, memblk);
             if ( 2 <= opts.debug ) {
                 fprintf( stderr, "DUP EVAL (%d) [%s]\n",
                     inn_s_i, (char *)(holdenv+inn_s_i));
@@ -175,7 +175,7 @@ main( int argc, char *argv[] )
         out_s_i = out_n_i + 1;
     }
 
-    if ( opts.seperator == holdenv[strzlengthn(holdenv, memblk)-1] ) {
+    if ( opts.delimiter == holdenv[strzlengthn(holdenv, memblk)-1] ) {
         holdenv[strzlengthn(holdenv, memblk)-1] = (char)0;
     }
 
@@ -216,7 +216,7 @@ check_opt( struct options *opt, int argc, char *argv[] )
     opt->before = 0;
     opt->debug = 0;
     opt->sizewarn = 1;
-    opt->seperator = ':';
+    opt->delimiter = ':';
     // NOT memset on env, as main will default it.
     memset(opt->extra, 0, ARG_MAX);
     // Read command line options...
@@ -279,14 +279,14 @@ check_opt( struct options *opt, int argc, char *argv[] )
             {
                 opt->debug = 1;
             }
-            else if ( goopt && strneqstrn( "--seperator", strlen("--seperator"),
+            else if ( goopt && strneqstrn( "--delimiter", strlen("--delimiter"),
                 argv[argcx], strlen(argv[argcx]) ) )
             {
                 if ( ( argcx + 1 < argc )
                     && ( 1 == strlen(argv[argcx+1]) ) )
                 {
                     argcx++;
-                    opt->seperator = argv[argcx][0];
+                    opt->delimiter = argv[argcx][0];
                 }
                 else {
                     usage(argv[0]);
@@ -355,7 +355,7 @@ check_opt( struct options *opt, int argc, char *argv[] )
                     askhelp = 1;
                 }
                 else if ( needf ) {
-                    opt->seperator = argv[argcx][cx];
+                    opt->delimiter = argv[argcx][cx];
                     needf = 0;
                 }
                 else {
@@ -369,7 +369,7 @@ check_opt( struct options *opt, int argc, char *argv[] )
                 if ( argcx + 1 >= argc )
                 {
                     fprintf( stderr,
-                        "No seperator given for '-F'\n" );
+                        "No delimiter given for '-F'\n" );
                     usage(argv[0]);
                     exit(2);
                 }
@@ -382,7 +382,7 @@ check_opt( struct options *opt, int argc, char *argv[] )
                 }
                 else {
                     argcx++;
-                    opt->seperator = *argv[argcx];
+                    opt->delimiter = *argv[argcx];
                 }
             }
         }
@@ -406,7 +406,7 @@ check_opt( struct options *opt, int argc, char *argv[] )
                     // If no first extra was collected during go
                     // we just have more extra.
                     strzcatnn(
-                        opt->extra, &opt->seperator,
+                        opt->extra, &opt->delimiter,
                         ARG_MAX,    1
                     );
                     strzcatn( opt->extra, argv[argcx], ARG_MAX );
@@ -415,7 +415,7 @@ check_opt( struct options *opt, int argc, char *argv[] )
             }
             else {
                 strzcatnn(
-                    opt->extra, &opt->seperator,
+                    opt->extra, &opt->delimiter,
                     ARG_MAX,    1
                 );
                 strzcatn( opt->extra, argv[argcx], ARG_MAX );
@@ -424,7 +424,7 @@ check_opt( struct options *opt, int argc, char *argv[] )
     }
     if ( opt->debug ) {
         fprintf( stderr, " --checkpaths: %d\n", opt->checkpaths );
-        fprintf( stderr, "  --seperator:'%c'\n", opt->seperator );
+        fprintf( stderr, "  --delimiter:'%c'\n", opt->delimiter );
         fprintf( stderr, "     --before: %d\n", opt->before );
         fprintf( stderr, "--nosizelimit: %d\n", !opt->sizewarn );
         fprintf( stderr, "      ENVNAME: %s\n", *opt->env?opt->env:"\t(none)" );
@@ -452,7 +452,7 @@ help(char *me)
     printf( "Help output for: %s\n", me);
     printf( "\n" );
     printf( "%s\n",
-        "Linux/MacOS utility to clean a colon separated ENV variable." );
+        "Linux/MacOS utility to clean a delimited ENV variable." );
     printf( "%s\n",
         "de-duplicated and processed contents printed to stdout." );
     printf( "\n" );
@@ -468,9 +468,9 @@ help(char *me)
     printf( "\t\t%s\n",
         "valid directory." );
     printf( "\t%s\n",
-        "--separator|-F" );
+        "--delimiter|-F" );
     printf( "\t\t%s\n",
-        "Single character separator of ENV components." );
+        "Single character delimiter of components." );
     printf( "\t%s\n",
         "--noenv|-X" );
     printf( "\t\t%s\n",
@@ -533,7 +533,7 @@ elim_mult( char *str, int strlen, struct options *opt )
     char * s    = str;
 
     while ( ( ( s - str ) < strlen )
-        && ( opt->seperator == s[0] ) )
+        && ( opt->delimiter == s[0] ) )
     {
         (char *)s++;
     }
@@ -542,7 +542,7 @@ elim_mult( char *str, int strlen, struct options *opt )
         (s - str) <= (strzlengthn(str, strlen)+1);
         (char *)s++ )
     {
-        if ( opt->seperator == s[0] ) {
+        if ( opt->delimiter == s[0] ) {
             crow++;
             if ( (char)0 == s[1] ) {
                 break;
@@ -565,7 +565,7 @@ elim_mult( char *str, int strlen, struct options *opt )
     /*
      * This will strip a final colon from the end of the string.
     if (   ( 1 < ( d - str ) )
-        && ( opt->seperator == *(char *)(d-1) ) )
+        && ( opt->delimiter == *(char *)(d-1) ) )
     {
         *(char *)(d-1) = 0;
     }
