@@ -20,26 +20,26 @@ I want to keep whatever that is.
 
 Old Way
 
->    if [ -d $HOME/bin ]; then
->        PATH=$HOME/bin:$PATH
->    fi
->    if [ -d $HOME/sbin ]; then
->        PATH=$HOME/sbin:$PATH
->    fi
->    if [ -d /usr/local/bin ]; then
->        PATH=$PATH:/usr/local/bin
->    fi
->    echo $PATH
->    /home/you/bin:/usr/bin:/usr/sbin:/usr/local/bin
+    if [ -d $HOME/bin ]; then
+        PATH=$HOME/bin:$PATH
+    fi
+    if [ -d $HOME/sbin ]; then
+        PATH=$HOME/sbin:$PATH
+    fi
+    if [ -d /usr/local/bin ]; then
+        PATH=$PATH:/usr/local/bin
+    fi
+    echo $PATH
+    /home/you/bin:/usr/bin:/usr/sbin:/usr/local/bin
 
 If for some reason my profile ran twice, then my PATH would mostly duplicate.
 
->    PATH=`cleanpath -Pb -- "${HOME}/bin" "${HOME}/sbin"`
->    export PATH
->    PATH=`cleanpath -P -- "/usr/local/bin"`
->    export PATH
->    echo $PATH
->    /home/you/bin:/usr/bin:/usr/sbin:/usr/local/bin
+    PATH=`cleanpath -Pb -- "${HOME}/bin" "${HOME}/sbin"`
+    export PATH
+    PATH=`cleanpath -P -- "/usr/local/bin"`
+    export PATH
+    echo $PATH
+    /home/you/bin:/usr/bin:/usr/sbin:/usr/local/bin
 
 - cleanpath -P will check each component in the PATH environment variable to
 verify it actually exists on the system.
