@@ -18,7 +18,7 @@ I want a common .profile across systems.  However, not all systems have
 the same things installed.  I inherit some stuff from the system itself, so
 I want to keep whatever that is.
 
-Old Way
+Really Old Way
 
     if [ -d $HOME/bin ]; then
         PATH=$HOME/bin:$PATH
@@ -32,6 +32,10 @@ Old Way
     # This goes on for many more lines
     echo $PATH
     /home/you/bin:/usr/bin:/usr/sbin:/usr/local/bin
+
+Then, I started doing what this project does with shell commands.
+That is a [snippet](https://gitlab.home.vollink.com/-/snippets/2)
+to see.
 
 If for some reason my profile ran twice, then my PATH would mostly duplicate.
 
