@@ -74,8 +74,9 @@ There are exactly two things this needs from non-standardized hearder files:
 - `ARG_MAX` : the OS character limit for a command line
 - `PATH_MAX` : the OS character limit for a full path
 
-Right now I check compiler #ifdef for `__MACH__` (MacOS) and
-load <sys/syslimits.h> otherwise, I load <linux/limits.h>
+Right now I am doing compiler define checks for `__MACH__` (MacOS),
+`__linux__`, and `__hpux` to try to get this right, falling back to
+a generic ask for `limits.h` for anything else.
 
 Fixing this for YOUR system should be easy.  The hard part is finding where
-those are defined.
+those are defined, and making it happen.

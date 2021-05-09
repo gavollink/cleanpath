@@ -18,10 +18,24 @@
 #ifdef __MACH__
     // MacOS file is here
 #include <sys/syslimits.h>
+#elif defined (__hpux)
+    // HP/UX file /may/ be here
+#include <sys/param.h>
+    // or here
+#include <limits.h>
+#ifndef PATH_MAX
+    // or here...
+#define PATH_MAX MAXPATHLEN
+#endif
+#elif defined (__linux__)
+#include <linux/limits.h>
     // Add More, If you have them
 #else
-    // Linux is the assumed default
-#include <linux/limits.h>
+    // Something on the internet suggested that this covers Solaris
+#include <limits.h>
+#ifndef PATH_MAX
+#define PATH_MAX MAXPATHLEN
+#endif
 #endif
 
 struct options {
