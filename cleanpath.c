@@ -549,13 +549,10 @@ elim_mult( char *str, int strlen, struct options *opt )
     while ( ( ( s - str ) < strlen )
         && ( opt->delimiter == s[0] ) )
     {
-        (char *)s++;
+        ++s;
     }
 
-    for( ;
-        (s - str) <= (strzlengthn(str, strlen)+1);
-        (char *)s++ )
-    {
+    for( ; (s - str) <= (strzlengthn(str, strlen)+1); s++ ) {
         if ( opt->delimiter == s[0] ) {
             crow++;
             if ( (char)0 == s[1] ) {
@@ -569,26 +566,13 @@ elim_mult( char *str, int strlen, struct options *opt )
             if ( *s != *d ) {
                 *d = *s;
             }
-            // printf( "S[%d] = %c; D[%d] = %c\n", (int)(s - str), *s, (int)(d - str), *d);
-            (char *)d++;
-        //} else {
-        //    printf( "S[%d] = %c; D[%d] = %c\n", (int)(s - str), *s, (int)(d - str), *d);
+            ++d;
         }
     }
 
-    /*
-     * This will strip a final colon from the end of the string.
-    if (   ( 1 < ( d - str ) )
-        && ( opt->delimiter == *(char *)(d-1) ) )
-    {
-        *(char *)(d-1) = 0;
-    }
-    */
-
     while ( s >= d ) {
         *d = (char)0;
-        //printf( "S[%d] = %c; D[%d] = %c\n", (int)(s - str), *s, (int)(d - str), *d);
-        (char *)d++;
+        ++d;
     }
     return str;
 }
