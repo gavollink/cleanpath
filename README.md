@@ -52,10 +52,10 @@ variable in the output.
 
 There are exactly two things this needs from non-standardized hearder files:
 
-- ARG_MAX : the OS character limit for a command line
-- PATH_MAX : the OS character limit for a full path
+- `ARG_MAX` : the OS character limit for a command line
+- `PATH_MAX` : the OS character limit for a full path
 
-Right now I check compiler #ifdef for __MACH__ (MacOS) and
+Right now I check compiler #ifdef for `__MACH__` (MacOS) and
 load <sys/syslimits.h> otherwise, I load <linux/limits.h>
 
 Fixing this for YOUR system should be easy.  The hard part is finding where
