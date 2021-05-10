@@ -15,11 +15,24 @@ gcc -Wall -o cleanpath cleanpath.c
 
 For UNIX bash/sh (.profile, .bashrc)
 
+I use multiple UNIX systems, but how does one set `PATH`, `LD_LIBRARY_PATH`,
+`CLASSPATH`, and `PERL5LIB` in .profile or .bashrc?
+
 I want a common .profile across systems.  However, not all systems have
 the same things installed.  I inherit some stuff from the system itself, so
 I want to keep whatever that is.
 
-Really Old Way
+### Most Common Way
+
+Here is the most common way to deal with PATH...
+
+```sh
+    PATH="$HOME/bin:$HOME/sbin:$PATH:/usr/local/bin"
+```
+
+If this system doesn't have $HOME/sbin, there's a path-hit fail every time a command is typed.
+
+### More Careful Way
 
 ```sh
     if [ -d $HOME/bin ]; then
@@ -31,27 +44,38 @@ Really Old Way
     if [ -d /usr/local/bin ]; then
         PATH=$PATH:/usr/local/bin
     fi
-    # This goes on for many more lines
+    # In reality, this would go on for many, MANY more lines
     echo $PATH
     /home/you/bin:/usr/bin:/usr/sbin:/usr/local/bin
 ```
+
+If for some reason my profile ran twice, then my PATH would mostly duplicate.
+
+```sh
+    echo $PATH
+    /home/you/bin:/home/you/bin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/bin
+```
+
+### This project but pure shell
 
 Then, I started doing what this project does with shell commands.
 That logic loop is a [sight](https://gitlab.home.vollink.com/-/snippets/2)
 to see.
 
-If for some reason my profile ran twice, then my PATH would mostly duplicate.
+### Using CleanPath instead
 
 Now my .profile looks like this...
 
 ```sh
-    PATH=`cleanpath -Pb -- "${HOME}/bin" "${HOME}/sbin"`
+    PATH=`cleanpath -Pb -- "${HOME:-x}/bin" "${HOME:-x}/sbin"`
     export PATH
     PATH=`cleanpath -P -- "/usr/local/bin"`
     export PATH
+```
+In reality, each line is longer, but there are no more individual lines to deal with PATH.
 
-    # Each line is longer, but there are no more lines
-    $ echo $PATH
+```sh
+    echo $PATH
     /home/you/bin:/usr/bin:/usr/sbin:/usr/local/bin
 ```
 
@@ -59,10 +83,14 @@ Now my .profile looks like this...
 verify it actually exists on the system.
 - cleanpath -b puts the command line parameters before the PATH environment
 variable in the output.
-- cleanpath always removes dupliates from the combined string.
-- cleanpath always removes dupliate ':' separators from the string.
 
-## Other Environment Variables
+## Non-obvious features
+
+- cleanpath always removes dupliates from the combined string.
+- cleanpath always removes dupliate delimiters from the string.
+- cleanpath removes delimiters from the beginning or end of the out.
+
+## Using With Other Environment Variables
 
 ```sh
     LD_LIBRARY_PATH=`cleanpath -Pb LD_LIBRARY_PATH -- "$HOME/lib"`
@@ -71,13 +99,38 @@ variable in the output.
     export LD_LIBRARY_PATH
 ```
 
-## Non environment lists (different seperator)...
+## Non environment lists
+
+This illustrates using a different separator and not pulling an
+environment variable.
 
 ```sh
     $ cleanpath -XF, -- abcd efgh ijkl efgh mnop abcd qrst
     abcd,efgh,ijkl,mnop,qrst
+```
+
+## Other examples
+
+This is exactly equivalent to above, mixing delimited ADDENV and non-delimited,
+separate ADDENV as above.
+
+```sh
     $ cleanpath -XF, -- abcd,efgh ijkl,efgh,mnop abcd qrst
     abcd,efgh,ijkl,mnop,qrst
+```
+
+Removing extra delimiters, as above, default delimiter.
+
+```sh
+    $ cleanpath -X ::::abcd: :efgh: :ijkl::efgh mnop:abcd: :qrst:::
+    abcd:efgh:ijkl:mnop:qrst
+```
+
+Space as delimiter
+
+```sh
+    $ cleanpath -XF' ' "   abcd efgh ijkl efgh  " mnop abcd qrst
+    abcd efgh ijkl mnop qrst
 ```
 
 ## Options
@@ -105,6 +158,7 @@ As shown in the examples above, short options can be bundled `-PbF-`
     
     --
         Stops looking for options, past this are only ENVADD
+        Very necessary if an ENVADD starts with a '-'.
     
     ENVADD
         Additional data to evaluate and add to output.
