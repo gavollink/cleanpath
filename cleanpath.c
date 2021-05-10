@@ -3,7 +3,7 @@
  *
  * Linux/MacOS utility to clean a colon separated ENV variable.
  */
-#define CP_VERSION "1.02"
+#define CP_VERSION "1.03"
 
 #include <stdio.h>          // printf
 #include <stdlib.h>         // exit, malloc, free
@@ -471,71 +471,74 @@ help(char *me)
         "de-duplicated and processed contents printed to stdout." );
     printf( "\n" );
     printf( "   Usage: %s [-P] [-b] [-F:] [ [ENVNAME] [--] ENVADD ]\n", me);
-    printf( " Or help: %s -h\n", me);
-    printf( " Example: PATH=`%s -Pb -- \"${HOME}/bin\"`\n", me );
+    printf( "\n" );
+    printf( " Example: PATH=`%s -Pb -- \"${HOME:-x}/bin\"`\n", me );
     printf( "    ...add ~/bin to the start of PATH, if it exists.\n" );
     printf( "\n" );
     printf( "\t%s\n",
         "--checkpaths|-P" );
     printf( "\t\t%s\n",
-        "Verify that each colon separated component is a" );
+                "Verify that each colon separated component is a" );
     printf( "\t\t%s\n",
-        "valid directory." );
+                "valid directory." );
     printf( "\t%s\n",
         "--delimiter|-F" );
     printf( "\t\t%s\n",
-        "Single character delimiter of components." );
+                "Single character delimiter of components." );
     printf( "\t%s\n",
         "--noenv|-X" );
     printf( "\t\t%s\n",
-        "Do not pull contents of an environment variable" );
+                "Do not pull contents of an environment variable" );
     printf( "\t%s\n",
         "--before|-b" );
     printf( "\t\t%s\n",
-        "Put ENVADD before ENV in output." );
+                "Put ENVADD before ENV in output." );
     printf( "\n" );
     printf( "\t%s\n",
         "ENVNAME" );
     printf( "\t\t%s\n",
-        "Name of environment variable to evaluate." );
+                "Name of environment variable to evaluate." );
     printf( "\t\t%s\n",
-        "If supplied must come before ENVADD and --." );
+                "If supplied must come before ENVADD and --." );
     printf( "\t\t%s\n",
-        "Disable with --noenv|-X." );
+                "Disable with --noenv|-X." );
     printf( "\t\t%s\n",
-        "Default: PATH" );
+                "Default: PATH" );
     printf( "\t%s\n",
         "--" );
     printf( "\t\t%s\n",
-        "Stops looking for options, every further string" );
+                "Stops looking for options, every further string" );
     printf( "\t\t%s\n",
-        "is treated as ENVADD." );
+                "is treated as ENVADD." );
     printf( "\t%s\n",
         "ENVADD" );
     printf( "\t\t%s\n",
-        "Extra data to add to ENV for output." );
+                "Extra data to add to ENV for output." );
     printf( "\t\t%s\n",
-        "If mulutiple ENVADD, ENVNAME or -- must be supplied." );
+                "If mulutiple ENVADD, ENVNAME or -- must be supplied." );
     printf( "\n" );
     printf( "\t%s\n",
         "--nosizelimit|-S" );
     printf( "\t\t%s\n",
-        "Do not print warning and shorten if processed string" );
+                "Do not print warning and shorten if processed string" );
     printf( "\t\t%s\n",
-        "+ ENVNAME + '=' is too large for a command line (ARG_MAX)." );
+                "+ ENVNAME + '=' is too large for a command line (ARG_MAX)." );
     printf( "\t\t%s\n",
-        "Useful as pipe source." );
+                "Useful as pipe source." );
     printf( "\t%s\n",
         "--help|-h" );
     printf( "\t\t%s\n",
-        "This help text." );
+                "This help text." );
     printf( "\t%s\n",
         "--debug" );
     printf( "\t\t%s\n",
-        "Enable debugging output." );
+                "Enable debugging output." );
+    /* Deliberately hiding --vdebug */
     printf( "\n" );
     printf( "Version: %s\n", CP_VERSION );
-    printf( "\tSystem ARG_MAX: %d,  PATH_MAX: %d\n", ARG_MAX, PATH_MAX );
+    printf( "\t(System ARG_MAX: %d,  PATH_MAX: %d)\n", ARG_MAX, PATH_MAX );
+    printf( "\n" );
+    printf( "Copyright (c) 2021 Gary Allen Vollink -- MIT License\n" );
     return;
 }
 
