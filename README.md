@@ -2,7 +2,8 @@
 
 ## Build...
 
-MacOS or Linux (so far)
+MacOS or Linux (as tested, so far) should work on any UNIX 
+(see [bottom](#compile-on-unix) of this README)
 
 cc -o cleanpath cleanpath.c
 
@@ -71,16 +72,21 @@ variable in the output.
     $ cleanpath -XF, -- abcd,efgh ijkl,efgh,mnop abcd qrst
     abcd,efgh,ijkl,mnop,qrst
 
-## Problems Compiling on some other UNIX
+## Compile on UNIX
 
-There are exactly two things this needs from non-standardized hearder files:
+As far as I know, there are only two things this needs from
+non-standardized hearder files:
 
 - `ARG_MAX` : the OS character limit for a command line
 - `PATH_MAX` : the OS character limit for a full path
 
 Right now I am doing compiler define checks for `__MACH__` (MacOS),
-`__linux__`, and `__hpux` to try to get this right, falling back to
+`__linux__`, and `__hpux` (even though I don't have access to this, 
+I used to work on it) to try to get this right, falling back to
 a generic ask for `limits.h` for anything else.
 
 Fixing this for YOUR system should be easy.  The hard part is finding where
-those are defined, and making it happen.
+those are defined, and making it happen.  I am curious to know if anybody 
+compiles this on another UNIX or a CPU other than x86 or armhf (Pi).
+
+    firstname @ lastname . com
