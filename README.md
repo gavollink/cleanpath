@@ -60,19 +60,20 @@ If for some reason my profile ran twice, then my PATH would mostly duplicate.
 
 Then, I started doing what this project does with shell commands.
 That logic loop is a [sight](https://gitlab.home.vollink.com/-/snippets/2)
-to see.
+to see.  Notably, that can't currently deal with a directory name with a
+space in it, where cleanpath can.
 
 ### Using CleanPath instead
 
 Now my .profile looks like this...
 
 ```sh
+    export PATH     # cleanpath cannot read what is not exported
     PATH=`cleanpath -Pb -- "${HOME:-x}/bin" "${HOME:-x}/sbin"`
-    export PATH
     PATH=`cleanpath -P -- "/usr/local/bin"`
-    export PATH
 ```
 In reality, each line is longer, but there are no more individual lines to deal with PATH.
+PATH is likely already exported, but this is illustrative of any ENVNAME requested.
 
 ```sh
     echo $PATH
@@ -178,6 +179,30 @@ As shown in the examples above, short options can be bundled `-PbF-`
         This isn't in --help, it's super verbose and only useful for debugging
         changes to this program itself.
 
+## Cautions
+
+- Use export before calling cleanpath, or cleanpath cannot read the 
+environment variable.
+- Cleanpath will preserve anything it can see that is not the delimiter:
+    - `cleanpath -X -- 'abcd' ' abcd'` will output `abcd: abcd`
+    - `cleanpath -X -- abcd: abcd` will output `abcd`
+    (without quoting, it won't see the space)
+
+## TODO
+
+At some point, I might upgrade this to use [DJB](https://cr.yp.to/) 
+strings.
+
+There are MANY features I could add, but this does what I need it to do 
+in less that 1000 lines of C.
+
+There is no Makefile because this project is self contained.  It doesn't 
+even have a header file.
+
+I haven't used csh since the 90s, but it is possible that for this to be 
+useful under csh (space delimited) that it would need an option to quote 
+individual components on output.  If someone asks, I can probably make 
+that happen.
 
 ## Compile on UNIX
 
