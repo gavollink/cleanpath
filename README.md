@@ -2,7 +2,7 @@
 
 ## Build...
 
-MacOS or Linux (as tested, so far) should work on any UNIX 
+MacOS or Linux (as tested, so far) and should work on any UNIX 
 (see [bottom](#compile-on-unix) of this README)
 
 cc -o cleanpath cleanpath.c
@@ -21,6 +21,7 @@ I want to keep whatever that is.
 
 Really Old Way
 
+```sh
     if [ -d $HOME/bin ]; then
         PATH=$HOME/bin:$PATH
     fi
@@ -33,15 +34,17 @@ Really Old Way
     # This goes on for many more lines
     echo $PATH
     /home/you/bin:/usr/bin:/usr/sbin:/usr/local/bin
+```
 
 Then, I started doing what this project does with shell commands.
-That is a [snippet](https://gitlab.home.vollink.com/-/snippets/2)
+That logic loop is a [sight](https://gitlab.home.vollink.com/-/snippets/2)
 to see.
 
 If for some reason my profile ran twice, then my PATH would mostly duplicate.
 
 Now my .profile looks like this...
 
+```sh
     PATH=`cleanpath -Pb -- "${HOME}/bin" "${HOME}/sbin"`
     export PATH
     PATH=`cleanpath -P -- "/usr/local/bin"`
@@ -50,6 +53,7 @@ Now my .profile looks like this...
     # Each line is longer, but there are no more lines
     $ echo $PATH
     /home/you/bin:/usr/bin:/usr/sbin:/usr/local/bin
+```
 
 - cleanpath -P will check each component in the PATH environment variable to
 verify it actually exists on the system.
@@ -60,17 +64,66 @@ variable in the output.
 
 ## Other Environment Variables
 
+```sh
     LD_LIBRARY_PATH=`cleanpath -Pb LD_LIBRARY_PATH -- "$HOME/lib"`
     export LD_LIBRARY_PATH
     LD_LIBRARY_PATH=`cleanpath -P LD_LIBRARY_PATH -- "/usr/local/lib"`
     export LD_LIBRARY_PATH
+```
 
 ## Non environment lists (different seperator)...
 
+```sh
     $ cleanpath -XF, -- abcd efgh ijkl efgh mnop abcd qrst
     abcd,efgh,ijkl,mnop,qrst
     $ cleanpath -XF, -- abcd,efgh ijkl,efgh,mnop abcd qrst
     abcd,efgh,ijkl,mnop,qrst
+```
+
+## Options
+
+As shown in the examples above, short options can be bundled `-PbF-`
+
+    --before
+    -b
+        Put ENVADD before the contents of ENVNAME in final output.  Useless
+        if --noenv is also used (will warn)
+    --checkpaths
+    -P
+        Verify that each --delimiter separated component is a valid directory.
+    --delimiter :
+    -F:
+        Single character delimiter for components both for output and inputs
+        Defaults to colon (:)
+    --noenv
+    -X
+        Do not pull components of an environment variable.
+        Will warn if --before is specified.
+
+    ENVNAME
+        Name of environment variable to pull in
+    
+    --
+        Stops looking for options, past this are only ENVADD
+    
+    ENVADD
+        Additional data to evaluate and add to output.
+        If delimited in a single argument, the delimiter must match --delimiter
+    
+    --nosizelimit
+    -S
+        Normally, if the ENVNAME, an equal sign, and the final output would 
+        be longer than the system ARG_MAX, the program will print an error
+        and truncate the output to match the ARG_MAX.  This option turns that off.
+    --debug
+        Prints what it is doing as it happens, good for viewing if the output
+        is not what was expected.
+    --help
+        Not exactly the same as this, but has the same info.
+    --vdebug
+        This isn't in --help, it's super verbose and only useful for debugging
+        changes to this program itself.
+
 
 ## Compile on UNIX
 
@@ -88,5 +141,6 @@ a generic ask for `limits.h` for anything else.
 Fixing this for YOUR system should be easy.  The hard part is finding where
 those are defined, and making it happen.  I am curious to know if anybody 
 compiles this on another UNIX or a CPU other than x86 or armhf (Pi).
+Also, this is a low traffic site, I can probably help if you have issues.
 
     firstname @ lastname . com
