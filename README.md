@@ -190,6 +190,10 @@ environment variable.
 
 ## TODO
 
+Detect EXISTS (as an option).
+CLASSPATH specifically can accept directory names AND jar files
+(-P) eliminates files.
+
 At some point, I might upgrade this to use [DJB](https://cr.yp.to/) 
 strings.
 
@@ -203,6 +207,12 @@ I haven't used csh since the 90s, but it is possible that for this to be
 useful under csh (space delimited) that it would need an option to quote 
 individual components on output.  If someone asks, I can probably make 
 that happen.
+
+Far off, I might consider auto-adjusting options based on the environment
+variable requested.  For example `cleanpath CLASSPATH -- ...` could
+invoke different options to the defaults (--exists).
+
+Reach out with suggestions.
 
 ## Compile on UNIX
 
