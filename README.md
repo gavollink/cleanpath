@@ -1,26 +1,17 @@
 # CleanPath
 
-## Build...
-
-MacOS or Linux (as tested, so far) and should work on any UNIX 
-(see [bottom](#compile-on-unix) of this README)
-
-cc -o cleanpath cleanpath.c
-
-or
-
-gcc -Wall -o cleanpath cleanpath.c
-
 ## What Is It?
 
 For UNIX bash/sh (.profile, .bashrc)
 
 I use multiple UNIX systems, but how does one set `PATH`, `LD_LIBRARY_PATH`,
-`CLASSPATH`, and `PERL5LIB` in .profile or .bashrc?
+`CLASSPATH`, and `PERL5LIB` in .profile or .bashrc, keep it clean and
+free of duplicaes?
 
 I want a common .profile across systems.  However, not all systems have
 the same things installed.  I inherit some stuff from the system itself, so
 I want to keep whatever that is.
+
 
 ### Most Common Way
 
@@ -80,16 +71,27 @@ PATH is likely already exported, but this is illustrative of any ENVNAME request
     /home/you/bin:/usr/bin:/usr/sbin:/usr/local/bin
 ```
 
-- cleanpath -P will check each component in the PATH environment variable to
+- cleanpath -P will check each token in the PATH environment variable to
 verify it actually exists on the system.
 - cleanpath -b puts the command line parameters before the PATH environment
 variable in the output.
 
+## Build...
+
+Should work on any UNIX, though MacOS and Linux have been tested
+(check [bottom](#compile-on-unix) of this README for more details).
+
+cc -o cleanpath cleanpath.c
+
+or
+
+gcc -Wall -o cleanpath cleanpath.c
+
 ## Non-obvious features
 
-- cleanpath always removes dupliates from the combined string.
-- cleanpath always removes dupliate delimiters from the string.
-- cleanpath removes delimiters from the beginning or end of the out.
+- cleanpath always removes dupliates from the combined output.
+- cleanpath always removes dupliate delimiters from the output.
+- cleanpath removes delimiters from the beginning and end of the output.
 
 ## Using With Other Environment Variables
 
@@ -142,23 +144,31 @@ As shown in the examples above, short options can be bundled `-PbF-`
     -b
         Put ENVADD before the contents of ENVNAME in final output.  Useless
         if --noenv is also used (will warn)
+    --exists
+    -e
+        Verify that each --delimiter separated token exists.
     --checkpaths
     -P
-        Verify that each --delimiter separated component is a valid directory.
+        Verify that each --delimiter separated token is a valid directory.
+    --checkfiles
+    -f
+        Verify that each --delimiter separated token is a valid directory.
     --delimiter :
     -F:
-        Single character delimiter for components both for output and inputs
+        Single character delimiter for tokens both for output and inputs
         Defaults to colon (:)
+    --env
+        A very explicit way to set the ENVNAME
     --noenv
     -X
-        Do not pull components of an environment variable.
+        Do not pull tokens of an environment variable.
         Will warn if --before is specified.
 
     ENVNAME
         Name of environment variable to pull in
     
     --
-        Stops looking for options, past this are only ENVADD
+        Stops looking for options, past this everything is seen as ENVADD
         Very necessary if an ENVADD starts with a '-'.
     
     ENVADD
@@ -175,6 +185,8 @@ As shown in the examples above, short options can be bundled `-PbF-`
         is not what was expected.
     --help
         Not exactly the same as this, but has the same info.
+    --license
+        Print the LICENSE.
     --vdebug
         This isn't in --help, it's super verbose and only useful for debugging
         changes to this program itself.
@@ -190,29 +202,24 @@ environment variable.
 
 ## TODO
 
-Detect EXISTS (as an option).
-CLASSPATH specifically can accept directory names AND jar files
-(-P) eliminates files.
-
 At some point, I might upgrade this to use [DJB](https://cr.yp.to/) 
 strings.
 
 There are MANY features I could add, but this does what I need it to do 
-in less that 1000 lines of C.
+in just less that 1000 lines of C.
 
 There is no Makefile because this project is self contained.  It doesn't 
 even have a header file.
 
 I haven't used csh since the 90s, but it is possible that for this to be 
-useful under csh (space delimited) that it would need an option to quote 
-individual components on output.  If someone asks, I can probably make 
-that happen.
+useful under csh, some big adjustements might need to be made.
+If someone asks, I can probably make that happen.
 
 Far off, I might consider auto-adjusting options based on the environment
 variable requested.  For example `cleanpath CLASSPATH -- ...` could
-invoke different options to the defaults (--exists).
+invoke different options to the defaults (-e) or (-Pf).
 
-Reach out with suggestions.
+Reach out with requests.
 
 ## Compile on UNIX
 

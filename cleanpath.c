@@ -5,7 +5,7 @@
  *
  * LICENSE: Embedded at bottom...
  */
-#define CP_VERSION "1.03.01"
+#define CP_VERSION "1.03.02"
 
 #include <stdio.h>          // printf
 #include <stdlib.h>         // exit, malloc, free
@@ -41,7 +41,9 @@
 #endif
 
 struct options {
-    int     checkmode;
+    int     exist;
+    int     file;
+    int     dir;
     int     before;
     int     debug;
     int     sizewarn;
@@ -51,9 +53,9 @@ struct options {
 };
 
 int     check_opt( struct options *opt, int argc, char *argv[] );
-int     default_opt( struct options *opt );
 void    help(char *me);
 void    usage(char *me);
+void    printlicense();
 int     strzindex( const char seek, const char *str, int start, int strlen );
 int     strzlengthn( const char *str, int strlen );
 int     strzcpyn( char *dest, const char *src, int destlen );
@@ -61,7 +63,16 @@ int     strzcpynn( char *dest, const char *src, int destlen, int srclen );
 int     strzcatn( char *dest, const char *src, int destlen );
 int     strzcatnn( char *dest, const char *src, int destlen, int srclen );
 int     strneqstrn( const char *seek, int seeklen, const char *str, int strlen );
+void    default_opt( struct options *opt );
+void    set_exist( struct options *opt, const char *arg, const int val );
+void    set_dir( struct options *opt, const char *arg, const int val );
+void    set_file( struct options *opt, const char *arg, const int val );
+void    set_before( struct options *opt, const char *arg, const int val );
+void    set_noenv( struct options *opt, const char *arg, const int val );
+void    set_env( struct options *opt, const char *arg, const char *val );
 char *  elim_mult( char *str, int strlen, struct options *opt );
+
+#define S_I_ALL (S_IFMT|S_ISUID|S_ISGID|S_ISVTX|S_IRWXU|S_IRWXG|S_IRWXO)
 
 int
 main( int argc, char *argv[] )
@@ -73,6 +84,9 @@ main( int argc, char *argv[] )
     char* origenv;
     struct options opts;
 
+    // init opt structure with defaults
+    default_opt( &opts );
+    // Set options
     check_opt( &opts, argc, argv );
 
     holdenv = malloc( memblk );
@@ -138,29 +152,43 @@ main( int argc, char *argv[] )
         if ( opts.debug ) {
             fprintf( stderr, "EVALUATE (%d) [%s]\n", out_s_i, path );
         }
-        if ( opts.checkmode ) {
+        if ( opts.exist || opts.file || opts.dir ) {
             statret = stat( path, &statbuf );
             int modefail = 0;
             if ( -1 == statret ) {
                 if ( opts.debug ) {
                     fprintf( stderr, "Not exists: \"%s\"\n", path );
                 }
-                modefail = 1;
+                modefail = 7;
             }
-            /* S_IFMT just means existence check, caught above */
-            else if ( ( S_IFMT != opts.checkmode )
-                && ( S_IFMT & opts.checkmode )
-                && ( opts.checkmode != ( statbuf.st_mode & S_IFMT ) ) )
+            /* file and dir checks below here, everything else, add above */
+            else if ( opts.file && opts.dir ) {
+                /* If BOTH are set, BOTH of these have to fail */
+                if (   ( S_IFDIR != ( statbuf.st_mode & S_IFMT ) )
+                    && ( S_IFREG != ( statbuf.st_mode & S_IFMT ) ) )
+                {
+                    if ( opts.debug ) {
+                        fprintf( stderr, "Not a regular file or dir: \"%s\"\n",
+                            path );
+                    }
+                    modefail = 3;
+                }
+            }
+            else if ( ( opts.file )
+                && ( S_IFREG != ( statbuf.st_mode & S_IFMT ) ) )
             {
-                /* 
-                 * checkmode isn't exactly S_IFMT (exists)
-                 * but is WITHIN S_IFMT mask
-                 * AND does NOT match that mode.
-                 * Anything else passes on.
-                 * This could leave room for more specific
-                 * permission checks, later.
-                 */
+                if ( opts.debug ) {
+                    fprintf( stderr, "Not a regular file: \"%s\"\n", path );
+                }
                 modefail = 2;
+            }
+            else if ( ( opts.dir )
+                && ( S_IFDIR != ( statbuf.st_mode & S_IFMT ) ) )
+            {
+                if ( opts.debug ) {
+                    fprintf( stderr, "Not a directory: \"%s\"\n", path );
+                }
+                modefail = 1;
             }
             if ( modefail ) {
                 strzcpynn( (char *)(holdenv+out_s_i),   // dest
@@ -168,11 +196,6 @@ main( int argc, char *argv[] )
                     memblk - out_s_i,                   // destlen
                     memblk - out_n_i - 1);              // srclen
                 if ( opts.debug ) {
-                    if ( 2 == modefail ) {
-                        fprintf( stderr,
-                            "mode failure: \"%s\" typemode %08o: want %08o\n",
-                            path, (S_IFMT & statbuf.st_mode), opts.checkmode );
-                    }
                     fprintf( stderr,
                         "Removed token: [%s] leaving [%s] (starting over)\n",
                         path, holdenv );
@@ -240,94 +263,89 @@ check_opt( struct options *opt, int argc, char *argv[] )
 {
     int argcx;
     int askhelp    = 0;
+    int asklicense = 0;
     int haveenv    = 0;
-    int beforewarn = 0;
-    // Keep reading options?
-    int goopt   = 1;
-    // Look for env if ENVADD?
-    int goenv   = 1;
-
-    // init opt structure with defaults
-    default_opt(opt);
+    int argFEatsArg = 0;
 
     // Read command line options...
     for ( argcx = 1; argcx < argc; argcx++ ) {
-        if ( 2 <= opt->debug ) {
-            fprintf( stderr, "CMDLINE %d [%s]\n", argcx, argv[argcx] );
-        }
-        if ( goopt && strneqstrn( "--", 2, argv[argcx], 2 ) ) {
-            if ( goopt && strneqstrn( "--before", strlen("--before"),
+
+        // Long Options, anything that starts with --
+        if ( strneqstrn( "--", 2, argv[argcx], 2 ) ) {
+            if ( 2 <= opt->debug ) {
+                fprintf( stderr, "CMDLINE %d [%s]\n", argcx, argv[argcx] );
+            }
+            if ( strneqstrn( "--before", strlen("--before"),
                 argv[argcx], strlen(argv[argcx]) ) )
             {
-                opt->before = 1;
-                if ( 0 == goenv && !beforewarn ) {
-                    beforewarn = 1;
-                    fprintf( stderr, "%s\n",
-                        "WARN: --before meaningless with --noenv" );
-                }
+                set_before( opt, argv[argcx], 1 );
             }
-            else if ( ( goopt )
-                 && ( strneqstrn( "--exists", strlen("--exists"),
+            else if ( strneqstrn( "--exists", strlen("--exists"),
                         argv[argcx], strlen(argv[argcx]) ) )
-                )
             {
-                opt->checkmode = S_IFMT;
+                set_exist( opt, argv[argcx], 1 );
             }
-            else if ( ( goopt )
-                 && ( strneqstrn( "--checkfiles", strlen("--checkfiles"),
+            else if ( strneqstrn( "--checkpaths", strlen("--checkpaths"),
                         argv[argcx], strlen(argv[argcx]) ) )
-                )
             {
-                opt->checkmode = S_IFREG;
+                set_dir( opt, argv[argcx], 1 );
             }
-            else if ( ( goopt )
-                 && ( strneqstrn( "--checkpaths", strlen("--checkpaths"),
+            else if ( strneqstrn( "--checkfiles", strlen("--checkfiles"),
                         argv[argcx], strlen(argv[argcx]) ) )
-                )
             {
-                opt->checkmode = S_IFDIR;
+                set_file( opt, argv[argcx], 1 );
             }
-            else if ( goopt && strneqstrn( "--noenv", strlen("--noenv"),
+            else if ( strneqstrn( "--noenv", strlen("--noenv"),
                 argv[argcx], strlen(argv[argcx]) ) )
             {
-                goenv = 0;
-                if ( opt->before && !beforewarn ) {
-                    beforewarn = 1;
-                    fprintf( stderr, "%s\n",
-                        "WARN: --before meaningless with --noenv" );
-                }
-                strzcpynn(opt->env, "", ARG_MAX, 1);
-                if ( haveenv ) {
-                    // This is inefficient,
-                    // but restart parsing args
-                    memset( opt->extra, 0, ARG_MAX);
-                    haveenv = 0;
-                    argcx   = 0;
-                    continue;
-                }
+                set_noenv( opt, argv[argcx], 1 );
+                haveenv = 1;
             }
-            else if ( goopt
-                && strneqstrn( "--nosizelimit", strlen("--nosizelimit"),
+            else if ( strneqstrn( "--env", strlen("--env"),
+                argv[argcx], strlen(argv[argcx]) ) )
+            {
+                if ( argcx + 1 < argc ) {
+                    set_env( opt, argv[argcx], argv[argcx+1] );
+                    argcx++;
+                }
+                else {
+                    usage(argv[0]);
+                    exit(2);
+                }
+                haveenv = 1;
+            }
+            else if ( strneqstrn( "--nosizelimit", strlen("--nosizelimit"),
                         argv[argcx], strlen(argv[argcx]) ) )
             {
                 opt->sizewarn = 0;
             }
-            else if ( goopt && strneqstrn( "--help", strlen("--help"),
+            else if ( strneqstrn( "--license", strlen("--license"),
+                argv[argcx], strlen(argv[argcx]) ) )
+            {
+                asklicense = 1;
+            }
+            else if ( strneqstrn( "--help", strlen("--help"),
                 argv[argcx], strlen(argv[argcx]) ) )
             {
                 askhelp = 1;
             }
-            else if ( goopt && strneqstrn( "--vdebug", strlen("--vdebug"),
+            else if ( strneqstrn( "--vdebug", strlen("--vdebug"),
                 argv[argcx], strlen(argv[argcx]) ) )
             {
-                opt->debug = 2;
+                if ( 2 != opt->debug ) {
+                    /* Extreme startover */
+                    default_opt(opt);
+                    opt->debug = 2;
+                    fprintf( stderr, "    --vdebug is go\n" );
+                    return check_opt( opt, argc, argv );
+                }
             }
-            else if ( goopt && strneqstrn( "--debug", strlen("--debug"),
+            else if ( strneqstrn( "--debug", strlen("--debug"),
                 argv[argcx], strlen(argv[argcx]) ) )
             {
                 opt->debug = 1;
             }
-            else if ( goopt && strneqstrn( "--delimiter", strlen("--delimiter"),
+            else if ( strneqstrn( "--delimiter", strlen("--delimiter"),
                 argv[argcx], strlen(argv[argcx]) ) )
             {
                 if ( ( argcx + 1 < argc )
@@ -341,11 +359,10 @@ check_opt( struct options *opt, int argc, char *argv[] )
                     exit(2);
                 }
             }
-            else if ( goopt && strneqstrn( "--", strlen("--"),
+            else if ( strneqstrn( "--", strlen("--"),
                 argv[argcx], strlen(argv[argcx]) ) )
             {
-                goopt = 0;
-                goenv = 0;
+                break;
             }
             else {
                 fprintf( stderr, "Unrecognized option '%s'\n", argv[argcx] );
@@ -353,9 +370,10 @@ check_opt( struct options *opt, int argc, char *argv[] )
                 exit(2);
             }
         }
-        else if ( ( goopt )
-             && ( strneqstrn( "-", 1, argv[argcx], 1 ) ) )
-        {
+        else if ( strneqstrn( "-", 1, argv[argcx], 1 ) ) {
+            if ( 2 <= opt->debug ) {
+                fprintf( stderr, "CMDLINE %d [%s]\n", argcx, argv[argcx] );
+            }
             if ( 1 >= strlen( argv[argcx] ) ) {
                 fprintf( stderr, "Unrecognized option '%s'\n", argv[argcx] );
                 usage(argv[0]);
@@ -365,24 +383,16 @@ check_opt( struct options *opt, int argc, char *argv[] )
             int needf = 0;
             for ( cx = 1; cx < strlen( argv[argcx] ); cx++ ) {
                 if ( 'e' == argv[argcx][cx] ) {
-                    if ( !opt->checkmode) {
-                        opt->checkmode = S_IFMT;
-                    }
+                    set_exist( opt, "-e", 1 );
                 }
                 else if ( 'P' == argv[argcx][cx] ) {
-                    opt->checkmode = (opt->checkmode | S_IFDIR);
+                    set_dir( opt, "-P", 1 );
                 }
                 else if ( 'f' == argv[argcx][cx] ) {
-                    opt->checkmode = opt->checkmode | S_IFREG;
+                    set_file( opt, "-f", 1 );
                 }
                 else if ( 'b' == argv[argcx][cx] ) {
-                    opt->before = 1;
-                    if ( 0 == goenv && !beforewarn ) {
-                        beforewarn = 1;
-                        fprintf( stderr, "%s\n",
-                            "WARN: --before meaningless with --noenv"
-                        );
-                    }
+                    set_before( opt, "-b", 1 );
                 }
                 else if ( 'S' == argv[argcx][cx] ) {
                     opt->sizewarn = 0;
@@ -391,22 +401,8 @@ check_opt( struct options *opt, int argc, char *argv[] )
                     needf = 1;
                 }
                 else if ( 'X' == argv[argcx][cx] ) {
-                    goenv = 0;
-                    if ( opt->before && !beforewarn ) {
-                        beforewarn = 1;
-                        fprintf( stderr, "%s\n",
-                            "WARN: --before meaningless with --noenv"
-                        );
-                    }
-                    strzcpynn(opt->env, "", ARG_MAX, 1);
-                    if ( haveenv ) {
-                        // This is inefficient,
-                        // but restart parsing args
-                        haveenv = 0;
-                        argcx   = 0;
-                        needf   = 0;
-                        break;
-                    }
+                    set_noenv( opt, "-X", 1 );
+                    haveenv = 1;
                 }
                 else if ( 'h' == argv[argcx][cx] ) {
                     askhelp = 1;
@@ -432,25 +428,74 @@ check_opt( struct options *opt, int argc, char *argv[] )
                 }
                 else if ( 1 != strlen(argv[argcx+1]) ) {
                     fprintf( stderr,
-                        "Seperator given for '-F', expects 1 long '%s'\n",
+                        "Delimiter given for '-F', needs length 1 (got '%s')\n",
                         argv[argcx+1] );
                     usage(argv[0]);
                     exit(2);
                 }
                 else {
+                    ++argFEatsArg;
                     argcx++;
                     opt->delimiter = *argv[argcx];
+                }
+            }
+        }
+    }
+
+    // Keep reading options?
+    int goopt   = 1;
+
+    // Loop 2 - Read non-option tokens
+    for ( argcx = 1; argcx < argc; argcx++ ) {
+        if ( goopt && strneqstrn( "-", 1, argv[argcx], 1 ) ) {
+            if ( goopt && strneqstrn( "--", strlen("--"),
+                argv[argcx], strlen(argv[argcx]) ) )
+            {
+                goopt = 0;
+            }
+            else if ( strneqstrn( "--env", strlen("--env"),
+                argv[argcx], strlen(argv[argcx]) ) )
+            {
+                argcx++;
+            }
+            else if ( strneqstrn( "--delimiter", strlen("--delimiter"),
+                argv[argcx], strlen(argv[argcx]) ) )
+            {
+                argcx++;
+            }
+            else if ( strneqstrn( "--delimiter", strlen("--delimiter"),
+                argv[argcx], strlen(argv[argcx]) ) )
+            {
+                argcx++;
+            }
+            else if ( goopt && argFEatsArg
+                && ( 0 == strneqstrn( "--", 2, argv[argcx], 2 ) ) )
+            {
+                int cx;
+                for (cx = 1; cx < strlen(argv[argcx]); cx++ ) {
+                    if ( 'F' == argv[argcx][cx] ) {
+                        argFEatsArg--;
+                        argcx++;
+                    }
                 }
             }
         }
         else {
             // BUG: If delimiter changes during processing,
             // everything will mess up reading extra.
-            if ( ( !haveenv ) && ( goenv ) ) {
+            if ( ( !haveenv ) && ( goopt ) ) {
+                if ( 2 <= opt->debug ) {
+                    fprintf( stderr, "CMDLINE %d [%s] as ENVNAME\n",
+                        argcx, argv[argcx] );
+                }
                 strzcpyn( opt->env, argv[argcx], ARG_MAX );
                 haveenv = 1;
             }
             else {
+                if ( 2 <= opt->debug ) {
+                    fprintf( stderr, "CMDLINE %d [%s] as ENVADD\n",
+                        argcx, argv[argcx] );
+                }
                 strzcatnn(
                     opt->extra, &opt->delimiter,
                     ARG_MAX,    1
@@ -459,16 +504,29 @@ check_opt( struct options *opt, int argc, char *argv[] )
             }
         }
     }
+
+    if ( opt->before && ( ! *opt->env ) ) {
+        fprintf( stderr, "%s\n", "WARN: --before meaningless with --noenv" );
+    }
+
     if ( opt->debug ) {
-        fprintf( stderr, "  Mode checks: %08o\n", opt->checkmode );
+        fprintf( stderr, "     --exists: %d\n",
+            (opt->exist|opt->file|opt->dir) );
+        fprintf( stderr, " --checkpaths: %d\n", opt->dir );
+        fprintf( stderr, " --checkfiles: %d\n", opt->file );
         fprintf( stderr, "  --delimiter:'%c'\n", opt->delimiter );
         fprintf( stderr, "     --before: %d\n", opt->before );
         fprintf( stderr, "--nosizelimit: %d\n", !opt->sizewarn );
         fprintf( stderr, "      ENVNAME: %s\n", *opt->env?opt->env:"\t(none)" );
         fprintf( stderr, "       ENVADD: %s\n", opt->extra );
     }
-    if ( askhelp ) {
-        help(argv[0]);
+    if ( askhelp | asklicense ) {
+        if ( askhelp ) {
+            help(argv[0]);
+        }
+        if ( asklicense ) {
+            printlicense();
+        }
         exit(0);
     }
     return 1;
@@ -478,8 +536,8 @@ void
 usage(char *me)
 {
     fprintf( stderr,
-        "   Usage: %s [-P] [-b] [-F:] [ [ENVNAME] [--] ENVADD ]\n", me);
-    fprintf( stderr, " Or help: %s -h\n", me);
+        "   Usage: %s [-ePfXbS] [-F:] [ [ENVNAME] [--] ENVADD ]\n", me);
+    fprintf( stderr, "For help: %s -h\n", me);
     return;
 }
 
@@ -493,7 +551,8 @@ help(char *me)
     printf( "%s\n",
         "de-duplicated and processed contents printed to stdout." );
     printf( "\n" );
-    printf( "   Usage: %s [-P] [-b] [-F:] [ENVNAME] [--] [ENVADD]\n", me);
+    printf(
+        "   Usage: %s [-ePfXbS] [-F:] [ [ENVNAME] [--] ENVADD ]\n", me);
     printf( "\n" );
     printf( " Example: PATH=`%s -Pb -- \"${HOME:-x}/bin\"`\n", me );
     printf( "    ...add ~/bin to the start of PATH, if it exists.\n" );
@@ -503,7 +562,7 @@ help(char *me)
     printf( "\t\t%s\n",
                 "Verify that each token exists in the filespace." );
     printf( "\t\t%s\n",
-                "Eclipses --checkfiles and --checkpaths" );
+                "Implied by --checkfiles and --checkpaths" );
     printf( "\t%s\n",
         "--checkfiles|-f" );
     printf( "\t\t%s\n",
@@ -519,9 +578,13 @@ help(char *me)
     printf( "\t\t%s\n",
                 "Default is colon (:)" );
     printf( "\t%s\n",
+        "--env ENVNAME" );
+    printf( "\t\t%s\n",
+                "Explicit setting of ENVNAME." );
+    printf( "\t%s\n",
         "--noenv|-X" );
     printf( "\t\t%s\n",
-                "Do not pull contents of an environment variable" );
+                "Do not pull contents of any environment variable" );
     printf( "\t%s\n",
         "--before|-b" );
     printf( "\t\t%s\n",
@@ -560,6 +623,10 @@ help(char *me)
         "--help|-h" );
     printf( "\t\t%s\n",
                 "This help text." );
+    printf( "\t%s\n",
+        "--license" );
+    printf( "\t\t%s\n",
+                "Show License." );
     printf( "\t%s\n",
         "--debug" );
     printf( "\t\t%s\n",
@@ -612,11 +679,13 @@ elim_mult( char *str, int strlen, struct options *opt )
 }
 
 
-int
+void
 default_opt( struct options *opt )
 {
     // init opt structure with defaults
-    opt->checkmode = 0;
+    opt->exist = 0;
+    opt->file = 0;
+    opt->dir = 0;
     opt->before = 0;
     opt->debug = 0;
     opt->sizewarn = 1;
@@ -624,14 +693,100 @@ default_opt( struct options *opt )
     memset( opt->extra, 0, ARG_MAX);
     strzcpynn( opt->env, "PATH", ARG_MAX, 4 );
 
-    return 1;
+    return;
+}
+
+void
+set_exist( struct options *opt, const char *arg, const int value )
+{
+    if ( value ) {
+        opt->exist = 1;
+    } else {
+        opt->exist = 0;
+    }
+    if ( 2 <= opt->debug ) {
+        fprintf( stderr, "    %s: check exists: %d\n", arg, opt->exist );
+    }
+}
+
+void
+set_dir( struct options *opt, const char *arg, const int value )
+{
+    if ( value ) {
+        opt->dir = 1;
+    } else {
+        opt->dir = 0;
+    }
+    if ( 2 <= opt->debug ) {
+        fprintf( stderr, "    %s: check if dir: %d\n", arg, opt->dir );
+    }
+}
+
+void
+set_file( struct options *opt, const char *arg, const int value )
+{
+    if ( value ) {
+        opt->file = 1;
+    } else {
+        opt->file = 0;
+    }
+    if ( 2 <= opt->debug ) {
+        fprintf( stderr, "    %s: check if file: %d\n", arg, opt->file );
+    }
+}
+
+void
+set_before( struct options *opt, const char *arg, const int value )
+{
+    if ( value ) {
+        opt->before = 1;
+    }
+    else {
+        opt->before = 0;
+    }
+    if ( 2 <= opt->debug ) {
+        fprintf( stderr, "    %s: before %d\n", arg, opt->before );
+    }
+    return;
+}
+
+void
+set_noenv( struct options *opt, const char *arg, const int value )
+{
+    if ( value ) {
+        strzcpynn(opt->env, "", ARG_MAX, 1);
+    }
+    else {
+        strzcpynn(opt->env, "PATH", ARG_MAX, 4);
+    }
+    if ( 2 <= opt->debug ) {
+        fprintf( stderr, "    %s: ENVNAME [%s]\n", arg, opt->env );
+    }
+    return;
+}
+
+void
+set_env( struct options *opt, const char *arg, const char *value )
+{
+    if ( *value ) {
+        strzcpyn(opt->env, value, ARG_MAX);
+    }
+    else {
+        strzcpynn(opt->env, "", ARG_MAX, 1);
+    }
+    if ( 2 <= opt->debug ) {
+        fprintf( stderr, "    %s: ENVNAME [%s]\n", arg, opt->env );
+    }
+    return;
 }
 
 /****************************************************************************
  * STRING FUNCTIONS
  */
 
-// Deliberately returns end of string if seek is not found.
+/***************************************
+ * Deliberately returns end of string if seek is not found.
+ */
 int
 strzindex( register const char seek,
             const char *str,
@@ -658,7 +813,7 @@ strzindex( register const char seek,
     return -1;
 }
 
-/****************************************************************************
+/***************************************
  * strzlengthn -- very much like strnlen, BUT
  *    if length reaches strlen, returns zero.
  */
@@ -676,23 +831,19 @@ strzlengthn( const char *str, register int strlen )
     return 0;
 }
 
-/****************************************************************************
- * copies src to dest like strncpy BUT
- * if a NUL is found in src,
- *      stops looking at src, and contineus to copy (char)0
- * stops copying at destlen - 2
- * always puts a null at dest[destlen - 1]
- */
-
 int
 strzcpyn( char *dest, const char *src, int destlen )
 {
     return strzcpynn( dest, src, destlen, destlen );
 }
 
-// like strncpy, but stops trying to copy from src if
-// src reaches an end of string.
-// Does complete destlen with (char)0
+/***************************************
+ * like strncpy, but
+ * if a NUL is found in src,
+ *      stops looking at src, and contineus to copy (char)0 until destlen-1
+ * stops copying at destlen - 2
+ * always puts a null at dest[destlen - 1]
+ */
 int
 strzcpynn( char *dest, const char *src, int destlen, int srclen )
 {
@@ -725,11 +876,9 @@ strzcpynn( char *dest, const char *src, int destlen, int srclen )
             dest[p] = src[p];
         }
         p++;
-//printf( "CPYDEST [%s](%d)\n", dest, p );
     }
     // ALWAYS sets destlen to NULL byte
     dest[p] = (char)0;
-//printf( "CPYDEST [%s](%d)\n", dest, destlen );
     return strzlengthn(dest, destlen);
 }
 
@@ -771,26 +920,31 @@ strneqstrn( const char *seek, int seeklen, const char *str, int strlen )
     return 1;
 }
 
-/****************************************************************************
-MIT License
-
-Copyright (c) 2021, Gary Allen Vollink
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-****************************************************************************/
+void
+printlicense()
+{
+    printf("\n\
+MIT License\n\
+\n\
+CleanPath https://gitlab.home.vollink.com/external/cleanpath/\n\
+Copyright (c) 2021, Gary Allen Vollink\n\
+\n\
+Permission is hereby granted, free of charge, to any person obtaining a copy\n\
+of this software and associated documentation files (the \"Software\"), to deal\n\
+in the Software without restriction, including without limitation the rights\n\
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\n\
+copies of the Software, and to permit persons to whom the Software is\n\
+furnished to do so, subject to the following conditions:\n\
+\n\
+The above copyright notice and this permission notice shall be included in all\n\
+copies or substantial portions of the Software.\n\
+\n\
+THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n\
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n\
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n\
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n\
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n\
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n\
+SOFTWARE.\n\n");
+}
+/* EOF cleanpath.c */
