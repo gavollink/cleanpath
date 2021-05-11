@@ -205,12 +205,6 @@ environment variable.
 At some point, I might upgrade this to use [DJB](https://cr.yp.to/) 
 strings.
 
-There are MANY features I could add, but this does what I need it to do 
-in just less that 1000 lines of C.
-
-There is no Makefile because this project is self contained.  It doesn't 
-even have a header file.
-
 I haven't used csh since the 90s, but it is possible that for this to be 
 useful under csh, some big adjustements might need to be made.
 If someone asks, I can probably make that happen.
@@ -220,6 +214,18 @@ variable requested.  For example `cleanpath CLASSPATH -- ...` could
 invoke different options to the defaults (-e) or (-Pf).
 
 Reach out with requests.
+
+## Deliberately NOT Done
+
+There is no Makefile because this project is self contained.  It doesn't 
+even have a header file.
+
+Some options do not have short alternatives.
+I set short options for everything that might be required in scripted use.
+Not for `--env` because ENVNAME default to the first bareword.
+
+There are MANY features I could add, but this does what I need it to do 
+in just less that 1000 lines of C.
 
 ## Compile on UNIX
 

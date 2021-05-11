@@ -98,6 +98,10 @@ main( int argc, char *argv[] )
 
     origenv = getenv(opts.env);
 
+    if ( opts.debug ) {
+        fprintf(stderr, "Pull ENVNAME, %s, \"%s\"\n", opts.env, origenv);
+    }
+
     if ( opts.before ) {
         // Concat any command-line extras into holdenv
         strzcatnn(
@@ -125,11 +129,15 @@ main( int argc, char *argv[] )
                 );
     }
 
-//printf("F: %s\n", holdenv);
+    if ( opts.debug ) {
+        fprintf(stderr, "Concat ENV and ENVADD => \"%s\"\n", holdenv);
+    }
 
     // Eliminate multiple :
     elim_mult( holdenv, memblk, &opts );
-//printf("E: %s\n", holdenv);
+    if ( opts.debug ) {
+        fprintf(stderr, "Remove redundant delimiters \"%s\"\n", holdenv);
+    }
 
     int    out_s_i = 0;
     int    out_n_i = 0;
@@ -558,21 +566,25 @@ help(char *me)
     printf( "    ...add ~/bin to the start of PATH, if it exists.\n" );
     printf( "\n" );
     printf( "\t%s\n",
-        "--exists|-e" );
+        "--before | -b" );
+    printf( "\t\t%s\n",
+                "Put ENVADD tokens before ENV in output." );
+    printf( "\t%s\n",
+        "--exists | -e" );
     printf( "\t\t%s\n",
                 "Verify that each token exists in the filespace." );
     printf( "\t\t%s\n",
                 "Implied by --checkfiles and --checkpaths" );
     printf( "\t%s\n",
-        "--checkfiles|-f" );
+        "--checkfiles | -f" );
     printf( "\t\t%s\n",
                 "Verify that each token is a regular file." );
     printf( "\t%s\n",
-        "--checkpaths|-P" );
+        "--checkpaths | -P" );
     printf( "\t\t%s\n",
                 "Verify that each token as a valid directory." );
     printf( "\t%s\n",
-        "--delimiter|-F" );
+        "--delimiter | -F" );
     printf( "\t\t%s\n",
                 "Single character delimiter of tokens." );
     printf( "\t\t%s\n",
@@ -582,13 +594,9 @@ help(char *me)
     printf( "\t\t%s\n",
                 "Explicit setting of ENVNAME." );
     printf( "\t%s\n",
-        "--noenv|-X" );
+        "--noenv | -X" );
     printf( "\t\t%s\n",
                 "Do not pull contents of any environment variable" );
-    printf( "\t%s\n",
-        "--before|-b" );
-    printf( "\t\t%s\n",
-                "Put ENVADD tokens before ENV in output." );
     printf( "\n" );
     printf( "\t%s\n",
         "ENVNAME" );
@@ -597,7 +605,7 @@ help(char *me)
     printf( "\t\t%s\n",
                 "If supplied must come before ENVADD and --." );
     printf( "\t\t%s\n",
-                "Disable with --noenv|-X." );
+                "Disable with --noenv | -X." );
     printf( "\t\t%s\n",
                 "Default is PATH" );
     printf( "\t%s\n",
@@ -612,7 +620,7 @@ help(char *me)
                 "Extra data to add to ENV for output." );
     printf( "\n" );
     printf( "\t%s\n",
-        "--nosizelimit|-S" );
+        "--nosizelimit | -S" );
     printf( "\t\t%s\n",
                 "Do not print warning and shorten if processed string" );
     printf( "\t\t%s\n",
@@ -620,7 +628,7 @@ help(char *me)
     printf( "\t\t%s\n",
                 "Useful as pipe source." );
     printf( "\t%s\n",
-        "--help|-h" );
+        "--help | -h" );
     printf( "\t\t%s\n",
                 "This help text." );
     printf( "\t%s\n",
@@ -683,12 +691,12 @@ void
 default_opt( struct options *opt )
 {
     // init opt structure with defaults
-    opt->exist = 0;
-    opt->file = 0;
-    opt->dir = 0;
-    opt->before = 0;
-    opt->debug = 0;
-    opt->sizewarn = 1;
+    opt->exist     = 0;
+    opt->file      = 0;
+    opt->dir       = 0;
+    opt->before    = 0;
+    opt->debug     = 0;
+    opt->sizewarn  = 1;
     opt->delimiter = ':';
     memset( opt->extra, 0, ARG_MAX);
     strzcpynn( opt->env, "PATH", ARG_MAX, 4 );
