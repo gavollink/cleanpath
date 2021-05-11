@@ -5,7 +5,7 @@
  *
  * LICENSE: Embedded at bottom...
  */
-#define CP_VERSION "1.03"
+#define CP_VERSION "1.03.01"
 
 #include <stdio.h>          // printf
 #include <stdlib.h>         // exit, malloc, free
@@ -41,7 +41,7 @@
 #endif
 
 struct options {
-    int     checkpaths;
+    int     checkmode;
     int     before;
     int     debug;
     int     sizewarn;
@@ -51,6 +51,7 @@ struct options {
 };
 
 int     check_opt( struct options *opt, int argc, char *argv[] );
+int     default_opt( struct options *opt );
 void    help(char *me);
 void    usage(char *me);
 int     strzindex( const char seek, const char *str, int start, int strlen );
@@ -71,7 +72,6 @@ main( int argc, char *argv[] )
     char* holdenv;
     char* origenv;
     struct options opts;
-    strzcpynn( opts.env, "PATH", ARG_MAX, 4 );
 
     check_opt( &opts, argc, argv );
 
@@ -138,21 +138,43 @@ main( int argc, char *argv[] )
         if ( opts.debug ) {
             fprintf( stderr, "EVALUATE (%d) [%s]\n", out_s_i, path );
         }
-        if ( opts.checkpaths ) {
+        if ( opts.checkmode ) {
             statret = stat( path, &statbuf );
-            if (   ( -1 == statret )
-                || ( 0 == ( statbuf.st_mode & S_IFDIR ) ) )
-            {
-                if ( 2 <= opts.debug ) {
-                    fprintf( stderr, "Not path: \"%s\"\n", path );
+            int modefail = 0;
+            if ( -1 == statret ) {
+                if ( opts.debug ) {
+                    fprintf( stderr, "Not exists: \"%s\"\n", path );
                 }
+                modefail = 1;
+            }
+            /* S_IFMT just means existence check, caught above */
+            else if ( ( S_IFMT != opts.checkmode )
+                && ( S_IFMT & opts.checkmode )
+                && ( opts.checkmode != ( statbuf.st_mode & S_IFMT ) ) )
+            {
+                /* 
+                 * checkmode isn't exactly S_IFMT (exists)
+                 * but is WITHIN S_IFMT mask
+                 * AND does NOT match that mode.
+                 * Anything else passes on.
+                 * This could leave room for more specific
+                 * permission checks, later.
+                 */
+                modefail = 2;
+            }
+            if ( modefail ) {
                 strzcpynn( (char *)(holdenv+out_s_i),   // dest
                     (char *)(holdenv+out_n_i+1),        // src
                     memblk - out_s_i,                   // destlen
                     memblk - out_n_i - 1);              // srclen
                 if ( opts.debug ) {
+                    if ( 2 == modefail ) {
+                        fprintf( stderr,
+                            "mode failure: \"%s\" typemode %08o: want %08o\n",
+                            path, (S_IFMT & statbuf.st_mode), opts.checkmode );
+                    }
                     fprintf( stderr,
-                        "Removed nonpath: [%s] leaving [%s] (starting over)\n",
+                        "Removed token: [%s] leaving [%s] (starting over)\n",
                         path, holdenv );
                 }
                 out_s_i = out_n_i = 0;
@@ -217,9 +239,6 @@ int
 check_opt( struct options *opt, int argc, char *argv[] )
 {
     int argcx;
-    int env        = 0;
-    int extra      = 0;
-    int goextra    = 0;
     int askhelp    = 0;
     int haveenv    = 0;
     int beforewarn = 0;
@@ -227,14 +246,10 @@ check_opt( struct options *opt, int argc, char *argv[] )
     int goopt   = 1;
     // Look for env if ENVADD?
     int goenv   = 1;
-    // init opt structure...
-    opt->checkpaths = 0;
-    opt->before = 0;
-    opt->debug = 0;
-    opt->sizewarn = 1;
-    opt->delimiter = ':';
-    // NOT memset on env, as main will default it.
-    memset(opt->extra, 0, ARG_MAX);
+
+    // init opt structure with defaults
+    default_opt(opt);
+
     // Read command line options...
     for ( argcx = 1; argcx < argc; argcx++ ) {
         if ( 2 <= opt->debug ) {
@@ -251,10 +266,26 @@ check_opt( struct options *opt, int argc, char *argv[] )
                         "WARN: --before meaningless with --noenv" );
                 }
             }
-            else if ( goopt && strneqstrn( "--checkpaths", strlen("--checkpaths"),
-                argv[argcx], strlen(argv[argcx]) ) )
+            else if ( ( goopt )
+                 && ( strneqstrn( "--exists", strlen("--exists"),
+                        argv[argcx], strlen(argv[argcx]) ) )
+                )
             {
-                opt->checkpaths = 1;
+                opt->checkmode = S_IFMT;
+            }
+            else if ( ( goopt )
+                 && ( strneqstrn( "--checkfiles", strlen("--checkfiles"),
+                        argv[argcx], strlen(argv[argcx]) ) )
+                )
+            {
+                opt->checkmode = S_IFREG;
+            }
+            else if ( ( goopt )
+                 && ( strneqstrn( "--checkpaths", strlen("--checkpaths"),
+                        argv[argcx], strlen(argv[argcx]) ) )
+                )
+            {
+                opt->checkmode = S_IFDIR;
             }
             else if ( goopt && strneqstrn( "--noenv", strlen("--noenv"),
                 argv[argcx], strlen(argv[argcx]) ) )
@@ -269,6 +300,7 @@ check_opt( struct options *opt, int argc, char *argv[] )
                 if ( haveenv ) {
                     // This is inefficient,
                     // but restart parsing args
+                    memset( opt->extra, 0, ARG_MAX);
                     haveenv = 0;
                     argcx   = 0;
                     continue;
@@ -313,6 +345,7 @@ check_opt( struct options *opt, int argc, char *argv[] )
                 argv[argcx], strlen(argv[argcx]) ) )
             {
                 goopt = 0;
+                goenv = 0;
             }
             else {
                 fprintf( stderr, "Unrecognized option '%s'\n", argv[argcx] );
@@ -331,8 +364,16 @@ check_opt( struct options *opt, int argc, char *argv[] )
             int cx;
             int needf = 0;
             for ( cx = 1; cx < strlen( argv[argcx] ); cx++ ) {
-                if ( 'P' == argv[argcx][cx] ) {
-                    opt->checkpaths = 1;
+                if ( 'e' == argv[argcx][cx] ) {
+                    if ( !opt->checkmode) {
+                        opt->checkmode = S_IFMT;
+                    }
+                }
+                else if ( 'P' == argv[argcx][cx] ) {
+                    opt->checkmode = (opt->checkmode | S_IFDIR);
+                }
+                else if ( 'f' == argv[argcx][cx] ) {
+                    opt->checkmode = opt->checkmode | S_IFREG;
                 }
                 else if ( 'b' == argv[argcx][cx] ) {
                     opt->before = 1;
@@ -403,31 +444,11 @@ check_opt( struct options *opt, int argc, char *argv[] )
             }
         }
         else {
-            if ( !extra ) {
-                strzcpyn( opt->extra, argv[argcx], ARG_MAX );
-                extra = 1;
-                if ( goopt & goenv ) {
-                    goextra = 1;
-                }
-            }
-            else if ( !env ) {
-                if ( goextra & goenv ) {
-                    // Something captured during 'go'
-                    // while no other EXTRA shows up is 'env'
-                    strzcpyn( opt->env, opt->extra, ARG_MAX );
-                    strzcpyn( opt->extra, argv[argcx], ARG_MAX );
-                    goextra = 0;
-                    haveenv = 1;
-                } else {
-                    // If no first extra was collected during go
-                    // we just have more extra.
-                    strzcatnn(
-                        opt->extra, &opt->delimiter,
-                        ARG_MAX,    1
-                    );
-                    strzcatn( opt->extra, argv[argcx], ARG_MAX );
-                }
-                env = 1;
+            // BUG: If delimiter changes during processing,
+            // everything will mess up reading extra.
+            if ( ( !haveenv ) && ( goenv ) ) {
+                strzcpyn( opt->env, argv[argcx], ARG_MAX );
+                haveenv = 1;
             }
             else {
                 strzcatnn(
@@ -439,7 +460,7 @@ check_opt( struct options *opt, int argc, char *argv[] )
         }
     }
     if ( opt->debug ) {
-        fprintf( stderr, " --checkpaths: %d\n", opt->checkpaths );
+        fprintf( stderr, "  Mode checks: %08o\n", opt->checkmode );
         fprintf( stderr, "  --delimiter:'%c'\n", opt->delimiter );
         fprintf( stderr, "     --before: %d\n", opt->before );
         fprintf( stderr, "--nosizelimit: %d\n", !opt->sizewarn );
@@ -472,21 +493,31 @@ help(char *me)
     printf( "%s\n",
         "de-duplicated and processed contents printed to stdout." );
     printf( "\n" );
-    printf( "   Usage: %s [-P] [-b] [-F:] [ [ENVNAME] [--] ENVADD ]\n", me);
+    printf( "   Usage: %s [-P] [-b] [-F:] [ENVNAME] [--] [ENVADD]\n", me);
     printf( "\n" );
     printf( " Example: PATH=`%s -Pb -- \"${HOME:-x}/bin\"`\n", me );
     printf( "    ...add ~/bin to the start of PATH, if it exists.\n" );
     printf( "\n" );
     printf( "\t%s\n",
+        "--exists|-e" );
+    printf( "\t\t%s\n",
+                "Verify that each token exists in the filespace." );
+    printf( "\t\t%s\n",
+                "Eclipses --checkfiles and --checkpaths" );
+    printf( "\t%s\n",
+        "--checkfiles|-f" );
+    printf( "\t\t%s\n",
+                "Verify that each token is a regular file." );
+    printf( "\t%s\n",
         "--checkpaths|-P" );
     printf( "\t\t%s\n",
-                "Verify that each colon separated component is a" );
-    printf( "\t\t%s\n",
-                "valid directory." );
+                "Verify that each token as a valid directory." );
     printf( "\t%s\n",
         "--delimiter|-F" );
     printf( "\t\t%s\n",
-                "Single character delimiter of components." );
+                "Single character delimiter of tokens." );
+    printf( "\t\t%s\n",
+                "Default is colon (:)" );
     printf( "\t%s\n",
         "--noenv|-X" );
     printf( "\t\t%s\n",
@@ -494,7 +525,7 @@ help(char *me)
     printf( "\t%s\n",
         "--before|-b" );
     printf( "\t\t%s\n",
-                "Put ENVADD before ENV in output." );
+                "Put ENVADD tokens before ENV in output." );
     printf( "\n" );
     printf( "\t%s\n",
         "ENVNAME" );
@@ -505,7 +536,7 @@ help(char *me)
     printf( "\t\t%s\n",
                 "Disable with --noenv|-X." );
     printf( "\t\t%s\n",
-                "Default: PATH" );
+                "Default is PATH" );
     printf( "\t%s\n",
         "--" );
     printf( "\t\t%s\n",
@@ -516,8 +547,6 @@ help(char *me)
         "ENVADD" );
     printf( "\t\t%s\n",
                 "Extra data to add to ENV for output." );
-    printf( "\t\t%s\n",
-                "If mulutiple ENVADD, ENVNAME or -- must be supplied." );
     printf( "\n" );
     printf( "\t%s\n",
         "--nosizelimit|-S" );
@@ -580,6 +609,22 @@ elim_mult( char *str, int strlen, struct options *opt )
         ++d;
     }
     return str;
+}
+
+
+int
+default_opt( struct options *opt )
+{
+    // init opt structure with defaults
+    opt->checkmode = 0;
+    opt->before = 0;
+    opt->debug = 0;
+    opt->sizewarn = 1;
+    opt->delimiter = ':';
+    memset( opt->extra, 0, ARG_MAX);
+    strzcpynn( opt->env, "PATH", ARG_MAX, 4 );
+
+    return 1;
 }
 
 /****************************************************************************
