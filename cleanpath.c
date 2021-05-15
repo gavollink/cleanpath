@@ -5,7 +5,7 @@
  *
  * LICENSE: Embedded at bottom...
  */
-#define CP_VERSION "1.03.03"
+#define CP_VERSION "1.03.04"
 
 #include <stdio.h>          // printf
 #include <stdlib.h>         // exit, malloc, free
@@ -16,7 +16,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-// ARG_MAX, PATH_MAX
+// ARG_MAX
 #ifdef __MACH__
     // MacOS file is here
 #include <sys/syslimits.h>
@@ -25,19 +25,12 @@
 #include <sys/param.h>
     // or here
 #include <limits.h>
-#ifndef PATH_MAX
-    // or here...
-#define PATH_MAX MAXPATHLEN
-#endif
 #elif defined (__linux__)
 #include <linux/limits.h>
     // Add More, If you have them
 #else
     // Something on the internet suggested that this covers Solaris
 #include <limits.h>
-#ifndef PATH_MAX
-#define PATH_MAX MAXPATHLEN
-#endif
 #endif
 
 #include "bstr.h"
@@ -135,138 +128,7 @@ main( int argc, char *argv[] )
 
     tokenwalk( &opts, holdenv );
 
-    int    out_s_i = 0;
-    int    out_n_i = 0;
-    int    inn_s_i = 0;
-    int    inn_n_i = 0;
-
-    struct stat statbuf;
-    char        path[PATH_MAX];   // TODO CONVERT!
-    int         statret;
-    while ( out_n_i < bstr_len(holdenv) ) {
-    //  while ( out_n_i < strzlengthn(holdenv, memblk) ) 
-        out_n_i = bstr_index(opts.delimiter, holdenv, out_s_i);
-        if ( out_n_i < out_s_i ) {
-            break;
-        }
-        // This seems to break if we run out of buffer?
-        if ( !strzlengthn((holdenv->s+out_s_i), (memblk - out_s_i) ) ) {
-            break;
-        }
-        // Break if out_s_i has reached the length of holdenv.
-        //  if ( out_s_i > holdenv->l ) {
-        //      break;
-        //  }
-        // TODO CONVERT!
-        strzcpynn(path, (holdenv->s+out_s_i), PATH_MAX, (out_n_i - out_s_i) );
-        if ( opts.debug ) {
-            fprintf( stderr, "EVALUATE (%d) [%s]\n", out_s_i, path );
-        }
-        if ( opts.exist || opts.file || opts.dir ) {
-            statret = stat( path, &statbuf );
-            int modefail = 0;
-            if ( -1 == statret ) {
-                if ( opts.debug ) {
-                    fprintf( stderr, "Not exists: \"%s\"\n", path );
-                }
-                modefail = 7;
-            }
-            /* file and dir checks below here, everything else, add above */
-            else if ( opts.file && opts.dir ) {
-                /* If BOTH are set, BOTH of these have to fail */
-                if (   ( S_IFDIR != ( statbuf.st_mode & S_IFMT ) )
-                    && ( S_IFREG != ( statbuf.st_mode & S_IFMT ) ) )
-                {
-                    if ( opts.debug ) {
-                        fprintf( stderr, "Not a regular file or dir: \"%s\"\n",
-                            path );
-                    }
-                    modefail = 3;
-                }
-            }
-            else if ( ( opts.file )
-                && ( S_IFREG != ( statbuf.st_mode & S_IFMT ) ) )
-            {
-                if ( opts.debug ) {
-                    fprintf( stderr, "Not a regular file: \"%s\"\n", path );
-                }
-                modefail = 2;
-            }
-            else if ( ( opts.dir )
-                && ( S_IFDIR != ( statbuf.st_mode & S_IFMT ) ) )
-            {
-                if ( opts.debug ) {
-                    fprintf( stderr, "Not a directory: \"%s\"\n", path );
-                }
-                modefail = 1;
-            }
-            if ( modefail ) {
-                strzcpynn( (char *)(holdenv->s+out_s_i),   // dest
-                    (char *)(holdenv->s+out_n_i+1),        // src
-                    memblk - out_s_i,                   // destlen
-                    memblk - out_n_i - 1);              // srclen
-                if ( opts.debug ) {
-                    fprintf( stderr,
-                        "Removed token: [%s] leaving [%s] (starting over)\n",
-                        path, holdenv->s );
-                }
-                out_s_i = out_n_i = 0;
-                continue;
-            }
-        }
-        inn_n_i = inn_s_i = (out_n_i + 1);
-        while ( inn_n_i < bstr_len(holdenv) ) {
-            inn_n_i = bstr_index(opts.delimiter, holdenv, inn_s_i);
-#ifdef DEBUG
-            if ( 2 <= opts.debug ) {
-                fprintf( stderr, "DUP EVAL (%d) [%s]\n",
-                    inn_s_i, (char *)(holdenv->s+inn_s_i));
-            }
-#endif
-            if ( inn_n_i < inn_s_i ) {
-                break;
-            }
-            if ( !strzlengthn((holdenv->s+inn_s_i), (memblk - inn_s_i) ) ) {
-                break;
-            }
-            if ( strneqstrn( (char *)(holdenv->s+out_s_i), // seekstr
-                    (out_n_i - out_s_i),                // seeklen
-                    (char *)(holdenv->s+inn_s_i),          // str
-                    (inn_n_i - inn_s_i) ) )             // strlen
-            {
-                if ( opts.debug ) {
-                    fprintf( stderr, "duplicate path: [%s] (removing)\n",
-                        path );
-                }
-                strzcpynn( (char *)(holdenv->s+inn_s_i),   // dest
-                    (char *)(holdenv->s+inn_n_i+1),        // src
-                    memblk - inn_s_i,                   // destlen
-                    memblk - inn_n_i );                 // srclen
-            }
-            inn_s_i = inn_n_i + 1;
-        }
-        out_s_i = out_n_i + 1;
-    }
-
-    if ( opts.delimiter == holdenv->s[bstr_len(holdenv)-1] ) {
-        holdenv->s[bstr_len(holdenv)-1] = (char)0;
-    }
-
-    int outmax = ( ARG_MAX - 1);
-    if ( *opts.env->s ) {
-        outmax = ( outmax - (bstr_len(opts.env) + 1) );
-    }
-
-    if (   ( opts.sizewarn )
-        && ( outmax < bstr_len(holdenv) ) )
-    {
-        fprintf( stderr,
-            "WARN: Output size (%d) larger than %d, truncated\n",
-            bstr_len(holdenv), outmax );
-        holdenv->s[outmax] = (char)0;
-        holdenv->l = outmax - 1;
-    }
-    printf( "%s\n", holdenv->s );
+    printf( "%s\n", BS(holdenv) );
     myexit(0);
 }
 
@@ -310,6 +172,54 @@ dedupe_in( struct options *opt, bstr *whole, bstr *test, int start )
     return(whole->l);
 }
 
+int
+token_check( struct options *opt, bstr *token )
+{
+    int modefail = 0;
+    struct stat statbuf;
+    int statret;
+    if ( opt->exist || opt->file || opt->dir ) {
+        statret = stat( BS(token), &statbuf );
+        if ( -1 == statret ) {
+            if ( opt->debug ) {
+                fprintf( stderr, "token_check(): Not exists: \"%s\"\n",
+                    BS(token) );
+            }
+            modefail = 7;
+        }
+        /* file and dir checks below here, everything else, add above */
+        else if ( opt->file && opt->dir ) {
+            /* If BOTH are set, BOTH of these have to fail */
+            if (   ( S_IFDIR != ( statbuf.st_mode & S_IFMT ) )
+                && ( S_IFREG != ( statbuf.st_mode & S_IFMT ) ) )
+            {
+                if ( opt->debug ) {
+                    fprintf( stderr, "token_check(): Not a regular file or dir: \"%s\"\n",
+                        BS(token) );
+                }
+                modefail = 3;
+            }
+        }
+        else if ( ( opt->file )
+            && ( S_IFREG != ( statbuf.st_mode & S_IFMT ) ) )
+        {
+            if ( opt->debug ) {
+                fprintf( stderr, "token_check(): Not a regular file: \"%s\"\n", BS(token) );
+            }
+            modefail = 2;
+        }
+        else if ( ( opt->dir )
+            && ( S_IFDIR != ( statbuf.st_mode & S_IFMT ) ) )
+        {
+            if ( opt->debug ) {
+                fprintf( stderr, "token_check(): Not a directory: \"%s\"\n", BS(token) );
+            }
+            modefail = 1;
+        }
+    }
+    return (modefail);
+}
+
 bstr *
 tokenwalk( struct options *opt, bstr *whole )
 {
@@ -331,6 +241,13 @@ tokenwalk( struct options *opt, bstr *whole )
                 out_s, BS(otoken), BS(whole) );
         }
         dedupe_in( opt, whole, otoken, out_n + 1 );
+        if ( token_check( opt, otoken ) ) {
+            bstr_splice( whole, out_s, out_n + 1, NULL );
+            if ( opt->debug ) {
+                fprintf( stderr, "tokenwalk(): Removed (%d)[%s] from [%s]\n",
+                    out_s, BS(otoken), BS(whole) );
+            }
+        }
         out_s = out_n + 1;
     }
     return whole;
@@ -728,7 +645,7 @@ help(char *me)
 #endif
     printf( "\n" );
     printf( "Version: %s\n", CP_VERSION );
-    printf( "\t(System ARG_MAX: %d,  PATH_MAX: %d)\n", ARG_MAX, PATH_MAX );
+    printf( "\t(System ARG_MAX: %d)\n", ARG_MAX );
     printf( "\n" );
     printf( "Copyright (c) 2021 Gary Allen Vollink -- MIT License\n" );
     return;
