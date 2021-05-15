@@ -5,7 +5,7 @@
  *
  * LICENSE: Embedded at bottom...
  */
-#define CP_VERSION "1.03.02"
+#define CP_VERSION "1.03.03"
 
 #include <stdio.h>          // printf
 #include <stdlib.h>         // exit, malloc, free
@@ -40,6 +40,8 @@
 #endif
 #endif
 
+#include "bstr.h"
+
 struct options {
     int     exist;
     int     file;
@@ -48,15 +50,15 @@ struct options {
     int     debug;
     int     sizewarn;
     char    delimiter;
-    char    env[ARG_MAX];
-    char    extra[ARG_MAX];
+    bstr    *env;
+    bstr    *extra;
 };
 
+bstr *  tokenwalk( struct options *opt, bstr *whole );
 int     check_opt( struct options *opt, int argc, char *argv[] );
 void    help(char *me);
 void    usage(char *me);
 void    printlicense();
-int     strzindex( const char seek, const char *str, int start, int strlen );
 int     strzlengthn( const char *str, int strlen );
 int     strzcpyn( char *dest, const char *src, int destlen );
 int     strzcpynn( char *dest, const char *src, int destlen, int srclen );
@@ -71,6 +73,8 @@ void    set_before( struct options *opt, const char *arg, const int val );
 void    set_noenv( struct options *opt, const char *arg, const int val );
 void    set_env( struct options *opt, const char *arg, const char *val );
 char *  elim_mult( char *str, int strlen, struct options *opt );
+bstr *  dedupe( struct options *opt, bstr *buffer );
+void    myexit(int status);
 
 #define S_I_ALL (S_IFMT|S_ISUID|S_ISGID|S_ISVTX|S_IRWXU|S_IRWXG|S_IRWXO)
 
@@ -80,7 +84,7 @@ main( int argc, char *argv[] )
     // An env variable can be near ARG_MAX in size.
     // Extras on command line can ALSO be near ARG_MAX in size...
     int memblk = ( ( ARG_MAX * 2 ) + 4 );
-    char* holdenv;
+    bstr* holdenv;
     char* origenv;
     struct options opts;
 
@@ -89,55 +93,47 @@ main( int argc, char *argv[] )
     // Set options
     check_opt( &opts, argc, argv );
 
-    holdenv = malloc( memblk );
-    if ( holdenv == NULL ) {
-        printf( "Unable to allocate memory: %s\n", strerror(errno) );
-        exit(5);
-    }
-    memset(holdenv, 0, memblk);
+    holdenv = new_bstr( memblk );
+    if ( holdenv == NULL ) { exit(5); }
 
-    origenv = getenv(opts.env);
+    origenv = getenv(opts.env->s);
 
     if ( opts.debug ) {
-        fprintf(stderr, "Pull ENVNAME, %s, \"%s\"\n", opts.env, origenv);
+        if ( !origenv ) {
+            fprintf(stderr, "Pull ENVNAME, %s, is empty\n", opts.env->s);
+        } else {
+            fprintf(stderr, "Pull ENVNAME, %s, \"%s\"\n", opts.env->s, origenv);
+        }
     }
 
     if ( opts.before ) {
         // Concat any command-line extras into holdenv
-        strzcatnn(
-                holdenv,
-                opts.extra,
-                memblk,
-                ARG_MAX
-                );
+        bstr_cat(holdenv, opts.extra);
         // Add a delimiter to holdenv
-        strzcatnn( holdenv, &opts.delimiter, memblk, 1 );
+        bstr_catstrz(holdenv, &opts.delimiter, 1);
         // Cat requested ENV VAR onto holdenv
-        strzcatn( holdenv, origenv, memblk );
+        bstr_catstrz(holdenv, origenv, holdenv->a);
     }
     else {
         // Copy requested ENV VAR into holdenv
-        strzcatn( holdenv, origenv, memblk );
+        bstr_catstrz(holdenv, origenv, holdenv->a);
         // Add a delimiter to holdenv
-        strzcatnn( holdenv, &opts.delimiter, memblk, 1 );
+        bstr_catstrz(holdenv, &opts.delimiter, 1);
         // Concat any command-line extras into holdenv
-        strzcatnn(
-                holdenv,
-                opts.extra,
-                memblk,
-                ARG_MAX
-                );
+        bstr_cat(holdenv, opts.extra);
     }
 
     if ( opts.debug ) {
-        fprintf(stderr, "Concat ENV and ENVADD => \"%s\"\n", holdenv);
+        fprintf(stderr, "Concat ENV and ENVADD => \"%s\"\n", holdenv->s);
     }
 
     // Eliminate multiple :
-    elim_mult( holdenv, memblk, &opts );
+    elim_mult( holdenv->s, holdenv->a, &opts );
     if ( opts.debug ) {
-        fprintf(stderr, "Remove redundant delimiters \"%s\"\n", holdenv);
+        fprintf(stderr, "Remove redundant delimiters \"%s\"\n", holdenv->s);
     }
+
+    tokenwalk( &opts, holdenv );
 
     int    out_s_i = 0;
     int    out_n_i = 0;
@@ -145,18 +141,24 @@ main( int argc, char *argv[] )
     int    inn_n_i = 0;
 
     struct stat statbuf;
-    char        path[PATH_MAX];
+    char        path[PATH_MAX];   // TODO CONVERT!
     int         statret;
-    while ( out_n_i < strzlengthn(holdenv, memblk) ) {
-        //memset( &statbuf, 0, sizeof(statbuf) );
-        out_n_i = strzindex(opts.delimiter, holdenv, out_s_i, memblk);
+    while ( out_n_i < bstr_len(holdenv) ) {
+    //  while ( out_n_i < strzlengthn(holdenv, memblk) ) 
+        out_n_i = bstr_index(opts.delimiter, holdenv, out_s_i);
         if ( out_n_i < out_s_i ) {
             break;
         }
-        if ( !strzlengthn((holdenv+out_s_i), (memblk - out_s_i) ) ) {
+        // This seems to break if we run out of buffer?
+        if ( !strzlengthn((holdenv->s+out_s_i), (memblk - out_s_i) ) ) {
             break;
         }
-        strzcpynn(path, (holdenv+out_s_i), PATH_MAX, (out_n_i - out_s_i) );
+        // Break if out_s_i has reached the length of holdenv.
+        //  if ( out_s_i > holdenv->l ) {
+        //      break;
+        //  }
+        // TODO CONVERT!
+        strzcpynn(path, (holdenv->s+out_s_i), PATH_MAX, (out_n_i - out_s_i) );
         if ( opts.debug ) {
             fprintf( stderr, "EVALUATE (%d) [%s]\n", out_s_i, path );
         }
@@ -199,43 +201,45 @@ main( int argc, char *argv[] )
                 modefail = 1;
             }
             if ( modefail ) {
-                strzcpynn( (char *)(holdenv+out_s_i),   // dest
-                    (char *)(holdenv+out_n_i+1),        // src
+                strzcpynn( (char *)(holdenv->s+out_s_i),   // dest
+                    (char *)(holdenv->s+out_n_i+1),        // src
                     memblk - out_s_i,                   // destlen
                     memblk - out_n_i - 1);              // srclen
                 if ( opts.debug ) {
                     fprintf( stderr,
                         "Removed token: [%s] leaving [%s] (starting over)\n",
-                        path, holdenv );
+                        path, holdenv->s );
                 }
                 out_s_i = out_n_i = 0;
                 continue;
             }
         }
         inn_n_i = inn_s_i = (out_n_i + 1);
-        while ( inn_n_i < strzlengthn(holdenv, memblk) ) {
-            inn_n_i = strzindex(opts.delimiter, holdenv, inn_s_i, memblk);
+        while ( inn_n_i < bstr_len(holdenv) ) {
+            inn_n_i = bstr_index(opts.delimiter, holdenv, inn_s_i);
+#ifdef DEBUG
             if ( 2 <= opts.debug ) {
                 fprintf( stderr, "DUP EVAL (%d) [%s]\n",
-                    inn_s_i, (char *)(holdenv+inn_s_i));
+                    inn_s_i, (char *)(holdenv->s+inn_s_i));
             }
+#endif
             if ( inn_n_i < inn_s_i ) {
                 break;
             }
-            if ( !strzlengthn((holdenv+inn_s_i), (memblk - inn_s_i) ) ) {
+            if ( !strzlengthn((holdenv->s+inn_s_i), (memblk - inn_s_i) ) ) {
                 break;
             }
-            if ( strneqstrn( (char *)(holdenv+out_s_i), // seekstr
+            if ( strneqstrn( (char *)(holdenv->s+out_s_i), // seekstr
                     (out_n_i - out_s_i),                // seeklen
-                    (char *)(holdenv+inn_s_i),          // str
+                    (char *)(holdenv->s+inn_s_i),          // str
                     (inn_n_i - inn_s_i) ) )             // strlen
             {
                 if ( opts.debug ) {
                     fprintf( stderr, "duplicate path: [%s] (removing)\n",
                         path );
                 }
-                strzcpynn( (char *)(holdenv+inn_s_i),   // dest
-                    (char *)(holdenv+inn_n_i+1),        // src
+                strzcpynn( (char *)(holdenv->s+inn_s_i),   // dest
+                    (char *)(holdenv->s+inn_n_i+1),        // src
                     memblk - inn_s_i,                   // destlen
                     memblk - inn_n_i );                 // srclen
             }
@@ -244,26 +248,92 @@ main( int argc, char *argv[] )
         out_s_i = out_n_i + 1;
     }
 
-    if ( opts.delimiter == holdenv[strzlengthn(holdenv, memblk)-1] ) {
-        holdenv[strzlengthn(holdenv, memblk)-1] = (char)0;
+    if ( opts.delimiter == holdenv->s[bstr_len(holdenv)-1] ) {
+        holdenv->s[bstr_len(holdenv)-1] = (char)0;
     }
 
     int outmax = ( ARG_MAX - 1);
-    if ( *opts.env ) {
-        outmax = ( outmax - (strzlengthn(opts.env, PATH_MAX) + 1) );
+    if ( *opts.env->s ) {
+        outmax = ( outmax - (bstr_len(opts.env) + 1) );
     }
 
     if (   ( opts.sizewarn )
-        && ( outmax < strzlengthn(holdenv, memblk) ) )
+        && ( outmax < bstr_len(holdenv) ) )
     {
         fprintf( stderr,
             "WARN: Output size (%d) larger than %d, truncated\n",
-            strzlengthn(holdenv, memblk), outmax );
-        holdenv[outmax] = (char)0;
+            bstr_len(holdenv), outmax );
+        holdenv->s[outmax] = (char)0;
+        holdenv->l = outmax - 1;
     }
-    printf( "%s\n", holdenv );
-    free( holdenv );
-    exit(0);
+    printf( "%s\n", holdenv->s );
+    myexit(0);
+}
+
+int
+dedupe_in( struct options *opt, bstr *whole, bstr *test, int start )
+{
+    int    inn_s = start;
+    int    inn_n = start;
+    bstr *itoken = new_bstr(whole->l);
+
+    while ( inn_n < bstr_len(whole) ) {
+        inn_n = bstr_index(opt->delimiter, whole, inn_s);
+        if ( ( 0 == inn_s ) && ( inn_n >= whole->l ) ) {
+            if ( opt->debug ) {
+                fprintf(stderr, "dedupe(): only one token");
+            }
+            break;
+        }
+        bstr_copystrz( itoken, (whole->s + inn_s), inn_n - inn_s );
+#ifdef DEBUG
+        if ( 2 <= opt->debug ) {
+            fprintf( stderr, "DUP EVAL (%d) [%s] to [%s]\n",
+                inn_s, BS(itoken), BS(test));
+        }
+#endif
+        if ( !bstr_eq( itoken, test ) ) {
+            if ( opt->debug ) {
+                fprintf( stderr, "duplicate token: [%s] (removing)\n",
+                    BS(itoken) );
+            }
+            bstr_splice( whole, inn_s, inn_n + 1, NULL );
+            if ( opt->debug ) {
+                fprintf( stderr, "duplicate token: [%s] removed leaving [%s]\n",
+                    BS(itoken), BS(whole) );
+            }
+            inn_s = inn_n = start;
+            continue;
+        }
+        inn_s = inn_n + 1;
+    }
+    return(whole->l);
+}
+
+bstr *
+tokenwalk( struct options *opt, bstr *whole )
+{
+    bstr *otoken = new_bstr(whole->l);
+    int    out_s = 0;
+    int    out_n = 0;
+    while ( out_n < bstr_len(whole) ) {
+        out_n = bstr_index(opt->delimiter, whole, out_s);
+        bstr_copystrz( otoken, (whole->s + out_s), out_n - out_s );
+        if ( ( 0 == out_s ) && ( out_n >= whole->l ) ) {
+            if ( opt->debug ) {
+                fprintf(stderr, "tokenwalk(): only one token [%s]\n",
+                    BS(otoken) );
+            }
+            break;
+        }
+        if ( opt->debug ) {
+            fprintf( stderr, "EVALUATE (%d) [%s] of [%s]\n",
+                out_s, BS(otoken), BS(whole) );
+        }
+        dedupe_in( opt, whole, otoken, out_n + 1 );
+        out_s = out_n + 1;
+    }
+    return whole;
 }
 
 int
@@ -280,9 +350,11 @@ check_opt( struct options *opt, int argc, char *argv[] )
 
         // Long Options, anything that starts with --
         if ( strneqstrn( "--", 2, argv[argcx], 2 ) ) {
+#ifdef DEBUG
             if ( 2 <= opt->debug ) {
                 fprintf( stderr, "CMDLINE %d [%s]\n", argcx, argv[argcx] );
             }
+#endif
             if ( strneqstrn( "--before", strlen("--before"),
                 argv[argcx], strlen(argv[argcx]) ) )
             {
@@ -318,7 +390,7 @@ check_opt( struct options *opt, int argc, char *argv[] )
                 }
                 else {
                     usage(argv[0]);
-                    exit(2);
+                    myexit(2);
                 }
                 haveenv = 1;
             }
@@ -337,6 +409,7 @@ check_opt( struct options *opt, int argc, char *argv[] )
             {
                 askhelp = 1;
             }
+#ifdef DEBUG
             else if ( strneqstrn( "--vdebug", strlen("--vdebug"),
                 argv[argcx], strlen(argv[argcx]) ) )
             {
@@ -348,6 +421,7 @@ check_opt( struct options *opt, int argc, char *argv[] )
                     return check_opt( opt, argc, argv );
                 }
             }
+#endif
             else if ( strneqstrn( "--debug", strlen("--debug"),
                 argv[argcx], strlen(argv[argcx]) ) )
             {
@@ -364,7 +438,7 @@ check_opt( struct options *opt, int argc, char *argv[] )
                 }
                 else {
                     usage(argv[0]);
-                    exit(2);
+                    myexit(2);
                 }
             }
             else if ( strneqstrn( "--", strlen("--"),
@@ -375,17 +449,19 @@ check_opt( struct options *opt, int argc, char *argv[] )
             else {
                 fprintf( stderr, "Unrecognized option '%s'\n", argv[argcx] );
                 usage(argv[0]);
-                exit(2);
+                myexit(2);
             }
         }
         else if ( strneqstrn( "-", 1, argv[argcx], 1 ) ) {
+#ifdef DEBUG
             if ( 2 <= opt->debug ) {
                 fprintf( stderr, "CMDLINE %d [%s]\n", argcx, argv[argcx] );
             }
+#endif
             if ( 1 >= strlen( argv[argcx] ) ) {
                 fprintf( stderr, "Unrecognized option '%s'\n", argv[argcx] );
                 usage(argv[0]);
-                exit(2);
+                myexit(2);
             }
             int cx;
             int needf = 0;
@@ -423,7 +499,7 @@ check_opt( struct options *opt, int argc, char *argv[] )
                     fprintf( stderr,
                         "Unrecognized option '-%c'\n", argv[argcx][cx] );
                     usage(argv[0]);
-                    exit(2);
+                    myexit(2);
                 }
             }
             if ( needf ) {
@@ -432,14 +508,14 @@ check_opt( struct options *opt, int argc, char *argv[] )
                     fprintf( stderr,
                         "No delimiter given for '-F'\n" );
                     usage(argv[0]);
-                    exit(2);
+                    myexit(2);
                 }
                 else if ( 1 != strlen(argv[argcx+1]) ) {
                     fprintf( stderr,
                         "Delimiter given for '-F', needs length 1 (got '%s')\n",
                         argv[argcx+1] );
                     usage(argv[0]);
-                    exit(2);
+                    myexit(2);
                 }
                 else {
                     ++argFEatsArg;
@@ -492,28 +568,29 @@ check_opt( struct options *opt, int argc, char *argv[] )
             // BUG: If delimiter changes during processing,
             // everything will mess up reading extra.
             if ( ( !haveenv ) && ( goopt ) ) {
+#ifdef DEBUG
                 if ( 2 <= opt->debug ) {
                     fprintf( stderr, "CMDLINE %d [%s] as ENVNAME\n",
                         argcx, argv[argcx] );
                 }
-                strzcpyn( opt->env, argv[argcx], ARG_MAX );
+#endif
+                set_env( opt, "ENVNAME(bareword)", argv[argcx] );
                 haveenv = 1;
             }
             else {
+#ifdef DEBUG
                 if ( 2 <= opt->debug ) {
                     fprintf( stderr, "CMDLINE %d [%s] as ENVADD\n",
                         argcx, argv[argcx] );
                 }
-                strzcatnn(
-                    opt->extra, &opt->delimiter,
-                    ARG_MAX,    1
-                );
-                strzcatn( opt->extra, argv[argcx], ARG_MAX );
+#endif
+                bstr_catstrz( opt->extra, &opt->delimiter, 1 );
+                bstr_catstrz( opt->extra, argv[argcx], ARG_MAX );
             }
         }
     }
 
-    if ( opt->before && ( ! *opt->env ) ) {
+    if ( opt->before && ( ! *opt->env->s ) ) {
         fprintf( stderr, "%s\n", "WARN: --before meaningless with --noenv" );
     }
 
@@ -525,8 +602,9 @@ check_opt( struct options *opt, int argc, char *argv[] )
         fprintf( stderr, "  --delimiter:'%c'\n", opt->delimiter );
         fprintf( stderr, "     --before: %d\n", opt->before );
         fprintf( stderr, "--nosizelimit: %d\n", !opt->sizewarn );
-        fprintf( stderr, "      ENVNAME: %s\n", *opt->env?opt->env:"\t(none)" );
-        fprintf( stderr, "       ENVADD: %s\n", opt->extra );
+        fprintf( stderr, "      ENVNAME: %s\n",
+                *opt->env->s?opt->env->s:"\t(none)" );
+        fprintf( stderr, "       ENVADD: %s\n", opt->extra->s );
     }
     if ( askhelp | asklicense ) {
         if ( askhelp ) {
@@ -535,7 +613,7 @@ check_opt( struct options *opt, int argc, char *argv[] )
         if ( asklicense ) {
             printlicense();
         }
-        exit(0);
+        myexit(0);
     }
     return 1;
 }
@@ -639,7 +717,15 @@ help(char *me)
         "--debug" );
     printf( "\t\t%s\n",
                 "Enable debugging output." );
-    /* Deliberately hiding --vdebug */
+#if 0
+    /* Deliberately hiding --vdebug, even if it's enabled */
+#ifdef DEBUG
+    printf( "\t%s\n",
+        "--vdebug" );
+    printf( "\t\t%s\n",
+                "Enable dev debugging output." );
+#endif
+#endif
     printf( "\n" );
     printf( "Version: %s\n", CP_VERSION );
     printf( "\t(System ARG_MAX: %d,  PATH_MAX: %d)\n", ARG_MAX, PATH_MAX );
@@ -698,8 +784,13 @@ default_opt( struct options *opt )
     opt->debug     = 0;
     opt->sizewarn  = 1;
     opt->delimiter = ':';
-    memset( opt->extra, 0, ARG_MAX);
-    strzcpynn( opt->env, "PATH", ARG_MAX, 4 );
+    opt->extra     = new_bstr(0);
+    opt->env       = new_bstr(4);
+
+    if ( opt->extra == NULL ) { myexit(5); }
+    if ( opt->env   == NULL ) { myexit(5); }
+
+    bstr_catstrz( opt->env, "PATH", 4 );
 
     return;
 }
@@ -712,9 +803,11 @@ set_exist( struct options *opt, const char *arg, const int value )
     } else {
         opt->exist = 0;
     }
+#ifdef DEBUG
     if ( 2 <= opt->debug ) {
         fprintf( stderr, "    %s: check exists: %d\n", arg, opt->exist );
     }
+#endif
 }
 
 void
@@ -725,9 +818,11 @@ set_dir( struct options *opt, const char *arg, const int value )
     } else {
         opt->dir = 0;
     }
+#ifdef DEBUG
     if ( 2 <= opt->debug ) {
         fprintf( stderr, "    %s: check if dir: %d\n", arg, opt->dir );
     }
+#endif
 }
 
 void
@@ -738,9 +833,11 @@ set_file( struct options *opt, const char *arg, const int value )
     } else {
         opt->file = 0;
     }
+#ifdef DEBUG
     if ( 2 <= opt->debug ) {
         fprintf( stderr, "    %s: check if file: %d\n", arg, opt->file );
     }
+#endif
 }
 
 void
@@ -752,9 +849,11 @@ set_before( struct options *opt, const char *arg, const int value )
     else {
         opt->before = 0;
     }
+#ifdef DEBUG
     if ( 2 <= opt->debug ) {
         fprintf( stderr, "    %s: before %d\n", arg, opt->before );
     }
+#endif
     return;
 }
 
@@ -762,14 +861,16 @@ void
 set_noenv( struct options *opt, const char *arg, const int value )
 {
     if ( value ) {
-        strzcpynn(opt->env, "", ARG_MAX, 1);
+        bstr_copystrz(opt->env, "", 1);
     }
     else {
-        strzcpynn(opt->env, "PATH", ARG_MAX, 4);
+        bstr_copystrz(opt->env, "PATH", 4);
     }
+#ifdef DEBUG
     if ( 2 <= opt->debug ) {
-        fprintf( stderr, "    %s: ENVNAME [%s]\n", arg, opt->env );
+        fprintf( stderr, "    %s: ENVNAME [%s]\n", arg, opt->env->s );
     }
+#endif
     return;
 }
 
@@ -777,49 +878,22 @@ void
 set_env( struct options *opt, const char *arg, const char *value )
 {
     if ( *value ) {
-        strzcpyn(opt->env, value, ARG_MAX);
+        bstr_copystrz(opt->env, value, ARG_MAX);
     }
     else {
-        strzcpynn(opt->env, "", ARG_MAX, 1);
+        bstr_copystrz(opt->env, "", 1);
     }
+#ifdef DEBUG
     if ( 2 <= opt->debug ) {
-        fprintf( stderr, "    %s: ENVNAME [%s]\n", arg, opt->env );
+        fprintf( stderr, "    %s: ENVNAME [%s]\n", arg, opt->env->s );
     }
+#endif
     return;
 }
 
 /****************************************************************************
  * STRING FUNCTIONS
  */
-
-/***************************************
- * Deliberately returns end of string if seek is not found.
- */
-int
-strzindex( register const char seek,
-            const char *str,
-            int start,
-            register int strlen )
-{
-    if ( !str ) {
-        return( -1 );
-    }
-    if ( !strlen ) {
-        return( -1 );
-    }
-    int p = start;
-    register const char *t = (char *)(str + p);
-    while ( p < strlen ) {
-        if ( seek == *t ) {
-            return p;
-        }
-        else if ( (char)0 == *t ) {
-            return p;
-        }
-        ++p; ++t;
-    }
-    return -1;
-}
 
 /***************************************
  * strzlengthn -- very much like strnlen, BUT
@@ -926,6 +1000,13 @@ strneqstrn( const char *seek, int seeklen, const char *str, int strlen )
         ++p; ++k; ++r;
     }
     return 1;
+}
+
+void
+myexit(int v)
+{
+    free_ALL_bstr();
+    exit(v);
 }
 
 void
