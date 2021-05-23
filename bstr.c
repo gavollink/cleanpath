@@ -152,12 +152,11 @@ strz_len_n(const char *src, int limit)
 int
 strz_len_z(const char *src, int limit)
 {
-    if (!src) {
-        return 0;
-    }
-    register const char *cx = src;
-    for( ; limit > ( cx - src ); cx++ ) {
-        if ( (char)0 == *cx ) { return ( cx - src ); }
+    if (!src) { return 0; }
+    register const char *check = src;
+    register const char *end = src + limit;
+    for( ; check < end; check++ ) {
+        if ( (char)0 == *check ) { return ( check - src ); }
     }
     return 0;
 }
@@ -249,10 +248,12 @@ bstr_catstrz(bstr *dest, const char *src, const size_t srclimit)
     for ( ;dsz < target; dsz++) {
         dest->s[dsz] = *sptr++;
         if ( (char)0 == *sptr ) {
+            ++dsz;
             break;
         }
     }
-    dest->l = ++dsz;
+    dest->l = dsz;
+    ++dsz;
     for ( ;dsz < dest->a; dsz++) {
         dest->s[dsz] = (char)0;
     }

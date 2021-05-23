@@ -52,11 +52,6 @@ int     check_opt( struct options *opt, int argc, char *argv[] );
 void    help(char *me);
 void    usage(char *me);
 void    printlicense();
-int     strzlengthn( const char *str, int strlen );
-int     strzcpyn( char *dest, const char *src, int destlen );
-int     strzcpynn( char *dest, const char *src, int destlen, int srclen );
-int     strzcatn( char *dest, const char *src, int destlen );
-int     strzcatnn( char *dest, const char *src, int destlen, int srclen );
 int     strneqstrn( const char *seek, int seeklen, const char *str, int strlen );
 void    default_opt( struct options *opt );
 void    set_exist( struct options *opt, const char *arg, const int val );
@@ -127,6 +122,10 @@ main( int argc, char *argv[] )
     }
 
     tokenwalk( &opts, holdenv );
+
+    if ( holdenv->s[ holdenv->l - 1 ] == opts.delimiter ) {
+        holdenv->s[ --holdenv->l ] = (char)0;
+    }
 
     printf( "%s\n", BS(holdenv) );
     myexit(0);
@@ -664,7 +663,7 @@ elim_mult( char *str, int strlen, struct options *opt )
         ++s;
     }
 
-    for( ; (s - str) <= (strzlengthn(str, strlen)+1); s++ ) {
+    for( ; (s - str) <= (strz_len_z(str, strlen)+1); s++ ) {
         if ( opt->delimiter == s[0] ) {
             crow++;
             if ( (char)0 == s[1] ) {
@@ -811,92 +810,6 @@ set_env( struct options *opt, const char *arg, const char *value )
 /****************************************************************************
  * STRING FUNCTIONS
  */
-
-/***************************************
- * strzlengthn -- very much like strnlen, BUT
- *    if length reaches strlen, returns zero.
- */
-int
-strzlengthn( const char *str, register int strlen )
-{
-    register int l = 0;
-    register const char * p = str;
-    while ( l < strlen ) {
-        if ( (char)0 == *p ) {
-            return l;
-        }
-        ++l; ++p;
-    }
-    return 0;
-}
-
-int
-strzcpyn( char *dest, const char *src, int destlen )
-{
-    return strzcpynn( dest, src, destlen, destlen );
-}
-
-/***************************************
- * like strncpy, but
- * if a NUL is found in src,
- *      stops looking at src, and contineus to copy (char)0 until destlen-1
- * stops copying at destlen - 2
- * always puts a null at dest[destlen - 1]
- */
-int
-strzcpynn( char *dest, const char *src, int destlen, int srclen )
-{
-    if ( !dest ) {
-        return 0;
-    }
-    if ( !src ) {
-        return 0;
-    }
-    if ( !destlen ) {
-        return 0;
-    }
-    int fzero = 0;      // found a src zero byte or end of srclen
-    int p = 0;          // progress
-    while ( p < ( destlen - 1 ) ) {
-        if ( fzero ) {
-            dest[p] = (char)0;
-        }
-        else if  ( p >= srclen ) {
-
-            // Check this first, to not read past srclen
-            fzero = 1;
-            dest[p] = (char)0;
-        }
-        else if  ( (char)0 == src[p] ) {
-            fzero = 1;
-            dest[p] = (char)0;
-        }
-        else {
-            dest[p] = src[p];
-        }
-        p++;
-    }
-    // ALWAYS sets destlen to NULL byte
-    dest[p] = (char)0;
-    return strzlengthn(dest, destlen);
-}
-
-int
-strzcatn( char *dest, const char *src, int destlen )
-{
-    return strzcatnn( dest, src, destlen, destlen );
-}
-
-int
-strzcatnn( char *dest, const char *src, int destlen, int srclen )
-{
-    int  dest_str_len = strzlengthn(dest, destlen);
-    char *rdest = (char *)( dest + dest_str_len );
-    int  rdestlen = ( destlen - dest_str_len );
-
-    return strzcpynn( rdest, src, rdestlen, srclen );
-}
-
 int
 strneqstrn( const char *seek, int seeklen, const char *str, int strlen )
 {
