@@ -69,9 +69,7 @@ void    myexit(int status);
 int
 main( int argc, char *argv[] )
 {
-    // An env variable can be near ARG_MAX in size.
-    // Extras on command line can ALSO be near ARG_MAX in size...
-    int memblk = ( ( ARG_MAX * 2 ) + 4 );
+    int memblk = 0;
     bstr* holdenv;
     char* origenv;
     struct options opts;
@@ -81,10 +79,12 @@ main( int argc, char *argv[] )
     // Set options
     check_opt( &opts, argc, argv );
 
+    origenv = getenv(opts.env->s);
+    if (*origenv) {
+        memblk = strz_len(origenv);
+    }
     holdenv = new_bstr( memblk );
     if ( holdenv == NULL ) { exit(5); }
-
-    origenv = getenv(opts.env->s);
 
     if ( opts.debug ) {
         if ( !origenv ) {
@@ -123,7 +123,7 @@ main( int argc, char *argv[] )
 
     tokenwalk( &opts, holdenv );
 
-    if ( holdenv->s[ holdenv->l - 1 ] == opts.delimiter ) {
+    while ( holdenv->s[ holdenv->l - 1 ] == opts.delimiter ) {
         holdenv->s[ --holdenv->l ] = (char)0;
     }
 
@@ -246,6 +246,8 @@ tokenwalk( struct options *opt, bstr *whole )
                 fprintf( stderr, "tokenwalk(): Removed (%d)[%s] from [%s]\n",
                     out_s, BS(otoken), BS(whole) );
             }
+            /* Chopped out current token, continue with new current token */
+            continue;
         }
         out_s = out_n + 1;
     }
@@ -501,7 +503,8 @@ check_opt( struct options *opt, int argc, char *argv[] )
                 }
 #endif
                 bstr_catstrz( opt->extra, &opt->delimiter, 1 );
-                bstr_catstrz( opt->extra, argv[argcx], ARG_MAX );
+                size_t arglen = strz_len(argv[argcx]);
+                bstr_catstrz( opt->extra, argv[argcx], arglen+1 );
             }
         }
     }
@@ -794,7 +797,8 @@ void
 set_env( struct options *opt, const char *arg, const char *value )
 {
     if ( *value ) {
-        bstr_copystrz(opt->env, value, ARG_MAX);
+        size_t arglen = strz_len(value);
+        bstr_copystrz(opt->env, value, arglen+1);
     }
     else {
         bstr_copystrz(opt->env, "", 1);

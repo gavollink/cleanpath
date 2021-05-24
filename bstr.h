@@ -5,8 +5,11 @@ typedef struct {
     char *  s;
     size_t  l;
     size_t  r;
+    size_t  rs;
     size_t  a;
 } bstr;
+
+#define MINCHUNK ((size_t)16)
 
 #define BS(x)       x->s
 #define BSFIX(x)    bstr_len(x)

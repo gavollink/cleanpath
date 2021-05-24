@@ -77,10 +77,13 @@ new_bstr(size_t len)
 {
     bstr *new;
     size_t minlen = ( ( len + 1 ) + sizeof(bstr) );
-    size_t getlen = 4096;
+    size_t getlen = MINCHUNK;
     while ( getlen < minlen ) {
-        getlen += 4096;
+        getlen += MINCHUNK;
     }
+    #ifdef DEBUG
+    fprintf(stderr, "new_bstr(%ld): requesting %ld\n", len, getlen);
+    #endif
     new = malloc( getlen );
     memset(new, 0, getlen);
     if ( new ) {
@@ -97,31 +100,6 @@ new_bstr(size_t len)
     return NULL;
 }
 
-#if 0
-int
-fresh_bstr(bstr *new, size_t len)
-{
-    memset(new, 0, sizeof(bstr));
-    size_t getlen = 4096;
-    while ( getlen < ( 4 + len ) ) {
-        getlen += 4096;
-    }
-    new->s = malloc( getlen );
-    if ( new->s ) {
-        new->a = getlen;
-        memset( new->s, 0, getlen );
-        if ( -1 == ( new->r = _allocreg(new->s) ) ) {
-            free(new->s);
-            memset(new, 0, sizeof(bstr));
-        }
-        else {
-            return 1;
-        }
-    }
-    return 0;
-}
-#endif
-
 void
 free_ALL_bstr()
 {
@@ -132,6 +110,9 @@ free_ALL_bstr()
 void
 free_bstr(bstr *str)
 {
+    if ( str->rs ) {
+        _allocfree(str->rs);
+    }
     _allocfree(str->r);
     return;
 }
@@ -230,16 +211,23 @@ bstr_catstrz(bstr *dest, const char *src, const size_t srclimit)
         dest->s, dsz, src, ssz, srclimit );
     #endif
     size_t target = ( dsz + ssz );
-    if ( dest->a < ( ( dsz + ssz ) + 4 ) ) {
+    if ( dest->a < ( ( dsz + ssz ) + 1 ) ) {
+        #ifdef DEBUG
+        fprintf(stderr, "bstr_catstrz(): Requesting larger (%ld) dest\n",
+            dsz + ssz + 1 );
+        #endif
+        size_t holdrs = dest->rs;
         bstr *replace = new_bstr( dsz + ssz + 1 );
         if ( !replace ) { return 0; }
-        bstr old;
-        memcpy( &old, dest, sizeof(bstr) );
         if ( !memcpy(replace->s, dest->s, dest->a) ) { return 0; }
-        dest->s = replace->s;
-        dest->a = replace->a;
-        dest->r = replace->r;
-        free_bstr(&old);
+        /* dest itself AND it's string remains untouched, and we simply
+         * point dest-> to the new data.  */
+        dest->s  = replace->s;
+        dest->a  = replace->a;
+        dest->rs = replace->r;
+        if ( holdrs ) {
+            _allocfree(holdrs);
+        }
     }
     #ifdef DEBUG
     fprintf(stderr, "bstr_catstrz() target len %ld\n", target);
@@ -326,7 +314,7 @@ bstr_splice( bstr* victim, int from, int to, bstr* dest )
             victim->s[from++] = victim->s[to++];
             if ( (char)0 == victim->s[to] ) {
                 nz = 0;
-                victim->l = from+1;
+                victim->l = from;
             }
         } else {
             victim->s[from++] = (char)0;

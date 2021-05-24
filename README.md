@@ -217,9 +217,6 @@ Reach out with requests.
 
 ## Deliberately NOT Done
 
-There is no Makefile because this project is self contained.  It doesn't 
-even have a header file.
-
 Some options do not have short alternatives.
 I set short options for everything that might be required in scripted use.
 Not for `--env` because ENVNAME default to the first bareword.
