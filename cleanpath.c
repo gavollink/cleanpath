@@ -16,6 +16,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#if 0
 // ARG_MAX
 #ifdef __MACH__
     // MacOS file is here
@@ -32,6 +33,7 @@
     // Something on the internet suggested that this covers Solaris
 #include <limits.h>
 #endif
+#endif
 
 #include "bstr.h"
 
@@ -41,7 +43,9 @@ struct options {
     int     dir;
     int     before;
     int     debug;
+#if 0
     int     sizewarn;
+#endif
     char    delimiter;
     bstr    *env;
     bstr    *extra;
@@ -312,11 +316,13 @@ check_opt( struct options *opt, int argc, char *argv[] )
                 }
                 haveenv = 1;
             }
+#if 0
             else if ( strneqstrn( "--nosizelimit", strlen("--nosizelimit"),
                         argv[argcx], strlen(argv[argcx]) ) )
             {
                 opt->sizewarn = 0;
             }
+#endif
             else if ( strneqstrn( "--license", strlen("--license"),
                 argv[argcx], strlen(argv[argcx]) ) )
             {
@@ -396,9 +402,11 @@ check_opt( struct options *opt, int argc, char *argv[] )
                 else if ( 'b' == argv[argcx][cx] ) {
                     set_before( opt, "-b", 1 );
                 }
+#if 0
                 else if ( 'S' == argv[argcx][cx] ) {
                     opt->sizewarn = 0;
                 }
+#endif
                 else if ( 'F' == argv[argcx][cx] ) {
                     needf = 1;
                 }
@@ -520,7 +528,9 @@ check_opt( struct options *opt, int argc, char *argv[] )
         fprintf( stderr, " --checkfiles: %d\n", opt->file );
         fprintf( stderr, "  --delimiter:'%c'\n", opt->delimiter );
         fprintf( stderr, "     --before: %d\n", opt->before );
+#if 0
         fprintf( stderr, "--nosizelimit: %d\n", !opt->sizewarn );
+#endif
         fprintf( stderr, "      ENVNAME: %s\n",
                 *opt->env->s?opt->env->s:"\t(none)" );
         fprintf( stderr, "       ENVADD: %s\n", opt->extra->s );
@@ -616,6 +626,7 @@ help(char *me)
     printf( "\t\t%s\n",
                 "Extra data to add to ENV for output." );
     printf( "\n" );
+#if 0
     printf( "\t%s\n",
         "--nosizelimit | -S" );
     printf( "\t\t%s\n",
@@ -624,6 +635,7 @@ help(char *me)
                 "+ ENVNAME + '=' is too large for a command line (ARG_MAX)." );
     printf( "\t\t%s\n",
                 "Useful as pipe source." );
+#endif
     printf( "\t%s\n",
         "--help | -h" );
     printf( "\t\t%s\n",
@@ -647,7 +659,9 @@ help(char *me)
 #endif
     printf( "\n" );
     printf( "Version: %s\n", CP_VERSION );
+#if 0
     printf( "\t(System ARG_MAX: %d)\n", ARG_MAX );
+#endif
     printf( "\n" );
     printf( "Copyright (c) 2021 Gary Allen Vollink -- MIT License\n" );
     return;
@@ -701,7 +715,9 @@ default_opt( struct options *opt )
     opt->dir       = 0;
     opt->before    = 0;
     opt->debug     = 0;
+#if 0
     opt->sizewarn  = 1;
+#endif
     opt->delimiter = ':';
     opt->extra     = new_bstr(0);
     opt->env       = new_bstr(4);
