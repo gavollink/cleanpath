@@ -5,7 +5,7 @@
  *
  * LICENSE: Embedded at bottom...
  */
-#define CP_VERSION "1.03.05"
+#define CP_VERSION "1.04"
 
 #include <stdio.h>          // printf
 #include <stdlib.h>         // exit, malloc, free
