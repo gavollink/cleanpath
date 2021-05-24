@@ -81,11 +81,18 @@ variable in the output.
 Should work on any UNIX, though MacOS and Linux have been tested
 (check [bottom](#compile-on-unix) of this README for more details).
 
-cc -o cleanpath cleanpath.c
+If 'make' is installed, adjust compile options in the Makefile 
+and type make
+
+    make
 
 or
 
-gcc -Wall -o cleanpath cleanpath.c
+    cc -o cleanpath cleanpath.c bstr.c
+
+or
+
+    gcc -Wall -O2 -o cleanpath cleanpath.c bstr.c
 
 ## Non-obvious features
 
@@ -174,12 +181,7 @@ As shown in the examples above, short options can be bundled `-PbF-`
     ENVADD
         Additional data to evaluate and add to output.
         If delimited in a single argument, the delimiter must match --delimiter
-    
-    --nosizelimit
-    -S
-        Normally, if the ENVNAME, an equal sign, and the final output would 
-        be longer than the system ARG_MAX, the program will print an error
-        and truncate the output to match the ARG_MAX.  This option turns that off.
+
     --debug
         Prints what it is doing as it happens, good for viewing if the output
         is not what was expected.
@@ -202,9 +204,6 @@ environment variable.
 
 ## TODO
 
-At some point, I might upgrade this to use [DJB](https://cr.yp.to/) 
-strings.
-
 I haven't used csh since the 90s, but it is possible that for this to be 
 useful under csh, some big adjustements might need to be made.
 If someone asks, I can probably make that happen.
@@ -222,23 +221,18 @@ I set short options for everything that might be required in scripted use.
 Not for `--env` because ENVNAME default to the first bareword.
 
 There are MANY features I could add, but this does what I need it to do 
-in just less that 1000 lines of C.
+in just less that 1400 lines of C.
 
 ## Compile on UNIX
 
-As far as I know, there are only two things this needs from
-non-standardized hearder files:
+This section used to have a discussion about which Header file ARG_MAX
+might be hidden in on various UNIX systems, but I removed the dependency 
+on needing to know.  First, I dynamically grow strings for the data being
+added.  Second, I removed a feature that used it.  Previous versions
+of this program would truncate the output to ARG_MAX unless told otherwise.
+It's exceedingly rare to run into that limit anyway, so I dropped it.
 
-- `ARG_MAX` : the OS character limit for a command line
-- `PATH_MAX` : the OS character limit for a full path
-
-Right now I am doing compiler define checks for `__MACH__` (MacOS),
-`__linux__`, and `__hpux` (even though I don't have access to this, 
-I used to work on it) to try to get this right, falling back to
-a generic ask for `limits.h` for anything else.
-
-Fixing this for YOUR system should be easy.  The hard part is finding where
-those are defined, and making it happen.  I am curious to know if anybody 
+I am curious to know if anybody 
 compiles this on another UNIX or a CPU other than x86 or armhf (Pi).
 Also, this is a low traffic site, I can probably help if you have issues.
 
