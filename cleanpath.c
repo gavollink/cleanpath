@@ -5,7 +5,7 @@
  *
  * LICENSE: Embedded at bottom...
  */
-#define CP_VERSION "1.04"
+#define CP_VERSION "1.05"
 
 #include <stdio.h>          // printf
 #include <stdlib.h>         // exit, malloc, free
@@ -84,7 +84,7 @@ main( int argc, char *argv[] )
     check_opt( &opts, argc, argv );
 
     origenv = getenv(opts.env->s);
-    if (*origenv) {
+    if ((origenv) && (*origenv)) {
         memblk = strz_len(origenv);
     }
     holdenv = new_bstr( memblk );
@@ -232,13 +232,6 @@ tokenwalk( struct options *opt, bstr *whole )
     while ( out_n < bstr_len(whole) ) {
         out_n = bstr_index(opt->delimiter, whole, out_s);
         bstr_copystrz( otoken, (whole->s + out_s), out_n - out_s );
-        if ( ( 0 == out_s ) && ( out_n >= whole->l ) ) {
-            if ( opt->debug ) {
-                fprintf(stderr, "tokenwalk(): only one token [%s]\n",
-                    BS(otoken) );
-            }
-            break;
-        }
         if ( opt->debug ) {
             fprintf( stderr, "EVALUATE (%d) [%s] of [%s]\n",
                 out_s, BS(otoken), BS(whole) );
@@ -251,6 +244,7 @@ tokenwalk( struct options *opt, bstr *whole )
                     out_s, BS(otoken), BS(whole) );
             }
             /* Chopped out current token, continue with new current token */
+            out_n = out_s;
             continue;
         }
         out_s = out_n + 1;
