@@ -204,6 +204,11 @@ environment variable.
 
 ## TODO
 
+I'm thinking about an elegant way to deal with LD_FLAGS settings... where
+' -L' precedes the folder to verify.  Or CC_FLAGS where a ' -I' precedes
+a directory.  There are a few places in my workflow where this would
+come in handy.
+
 I haven't used csh since the 90s, but it is possible that for this to be 
 useful under csh, some big adjustements might need to be made.
 If someone asks, I can probably make that happen.
