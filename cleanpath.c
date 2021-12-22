@@ -16,6 +16,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#ifdef __linux__
+#   include <bits/stat.h>
+#endif
 #if 0
 // ARG_MAX
 #ifdef __MACH__
