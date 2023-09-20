@@ -1,0 +1,6 @@
+.*.swp
+.*.swo
+cleanpath
+cleanpath.o
+cleanpath.obj
+*.cleanpath
