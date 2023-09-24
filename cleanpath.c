@@ -5,7 +5,7 @@
  *
  * LICENSE: Embedded at bottom...
  */
-#define CP_VERSION "1.05"
+#define CP_VERSION "1.06"
 
 #include <stdio.h>          // printf
 #include <stdlib.h>         // exit, malloc, free
@@ -349,17 +349,51 @@ check_opt( struct options *opt, int argc, char *argv[] )
                 opt->debug = 1;
             }
             else if ( strneqstrn( "--delimiter", strlen("--delimiter"),
-                argv[argcx], strlen(argv[argcx]) ) )
+                argv[argcx], strlen("--delimiter") ) )
             {
-                if ( ( argcx + 1 < argc )
-                    && ( 1 == strlen(argv[argcx+1]) ) )
-                {
-                    argcx++;
-                    opt->delimiter = argv[argcx][0];
+                int getnow = 0;
+                if ( strlen(argv[argcx]) == strlen("--delimiter") ) {
+                    getnow = 1;
                 }
-                else {
+                else if ( strlen(argv[argcx]) > 2+strlen("--delimiter") ) {
+                    fprintf( stderr,
+                            "Unrecognized option '%s'\n",
+                            argv[argcx] );
                     usage(argv[0]);
                     myexit(2);
+                }
+                else if ( strneqstrn( "--delimiter=", strlen("--delimiter="),
+                            argv[argcx], strlen("--delimiter=") ) )
+                {
+                    if ( strlen(argv[argcx]) == 1 + strlen("--delimiter=") )
+                    {
+                        getnow = 0;
+                        opt->delimiter = argv[argcx][strlen(argv[argcx])-1];
+                    } else {
+                        getnow = 1;
+                    }
+                }
+                else {
+                    fprintf( stderr,
+                            "Unrecognized option '%s'\n",
+                            argv[argcx] );
+                    usage(argv[0]);
+                    myexit(2);
+                }
+                if ( getnow ) {
+                    if ( ( argcx + 1 < argc )
+                        && ( 1 == strlen(argv[argcx+1]) ) )
+                    {
+                        argcx++;
+                        opt->delimiter = argv[argcx][0];
+                    }
+                    else {
+                        fprintf( stderr,
+                                "Used option '%s', but no delimiter.\n",
+                                argv[argcx] );
+                        usage(argv[0]);
+                        myexit(2);
+                    }
                 }
             }
             else if ( strneqstrn( "--", strlen("--"),
@@ -470,7 +504,7 @@ check_opt( struct options *opt, int argc, char *argv[] )
             {
                 argcx++;
             }
-            else if ( strneqstrn( "--delimiter", strlen("--delimiter"),
+            else if ( strneqstrn( "--delimiter=", strlen("--delimiter="),
                 argv[argcx], strlen(argv[argcx]) ) )
             {
                 argcx++;
