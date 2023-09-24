@@ -7,7 +7,12 @@ CCFLAGS+=-ggdb -DDEBUG
 endif
 #CCFLAGS+=-ggdb
 
-INSTALLDIR=
+## NO DEFAULT PREFIX (not even /)
+prefix:=
+exec_prefix:=$(prefix)
+sbindir:=sbin/
+DESTDIR:=
+INSTALLDIR:=$(DESTDIR)$(exec_prefix)$(sbindir)
 
 FINAL=cleanpath
 SOURCE=bstr.c cleanpath.c
@@ -65,12 +70,13 @@ default.$(FINAL): $(SOURCE) $(X_DEPS)
 	$(CC) $(CCFLAGS) -o default.$(FINAL) $(SOURCE)
 
 install: $(FINAL)
-	@if [ -d "$(INSTALLDIR)" ]; then \
-		install -m 775 -C $(FINAL) $(HOME)/sbin; \
-	elif [ -z "$(INSTALLDIR)" ]; then \
-		echo "Cannot install, 'INSTALLDIR=', is not set." ; \
+	@if [ "sbin/" = "$(INSTALLDIR)" ]; then \
+		echo "Cannot install, prefix= and DESTDIR=, both empty." ; \
 		echo "TRY: $$ make INSTALLDIR=<path> install" ; \
-		false ;\
+		false; \
+	elif [ -d "$(INSTALLDIR)" ]; then \
+		echo "install -m 775 -C $(FINAL) $(INSTALLDIR)"; \
+		install -m 775 -C $(FINAL) $(INSTALLDIR); \
 	else \
 		echo "Cannot install, 'INSTALLDIR=$(INSTALLDIR)', does not exist." ; \
 		false ;\
