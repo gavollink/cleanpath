@@ -445,6 +445,9 @@ check_opt( struct options *opt, int argc, char *argv[] )
                     set_noenv( opt, "-X", 1 );
                     haveenv = 1;
                 }
+                else if ( 'v' == argv[argcx][cx] ) {
+                    opt->debug = 1;
+                }
                 else if ( 'h' == argv[argcx][cx] ) {
                     askhelp = 1;
                 }
@@ -676,7 +679,7 @@ help(char *me)
     printf( "\t\t%s\n",
                 "Show License." );
     printf( "\t%s\n",
-        "--debug" );
+        "--debug | -v" );
     printf( "\t\t%s\n",
                 "Enable debugging output." );
 #if 0
@@ -694,7 +697,7 @@ help(char *me)
     printf( "\t(System ARG_MAX: %d)\n", ARG_MAX );
 #endif
     printf( "\n" );
-    printf( "Copyright (c) 2021 Gary Allen Vollink -- MIT License\n" );
+    printf( "Copyright (c) 2021, 2023 Gary Allen Vollink -- MIT License\n" );
     return;
 }
 
@@ -897,7 +900,7 @@ printlicense()
 MIT License\n\
 \n\
 CleanPath https://gitlab.home.vollink.com/external/cleanpath/\n\
-Copyright (c) 2021, Gary Allen Vollink\n\
+Copyright (c) 2021, 2023 Gary Allen Vollink\n\
 \n\
 Permission is hereby granted, free of charge, to any person obtaining a copy\n\
 of this software and associated documentation files (the \"Software\"), to deal\n\
