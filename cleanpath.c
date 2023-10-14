@@ -5,7 +5,7 @@
  *
  * LICENSE: Embedded at bottom...
  */
-#define CP_VERSION "1.06"
+#define CP_VERSION "1.07"
 
 #include <stdio.h>          // printf
 #include <stdlib.h>         // exit, malloc, free
@@ -58,6 +58,7 @@ bstr *  tokenwalk( struct options *opt, bstr *whole );
 int     check_opt( struct options *opt, int argc, char *argv[] );
 void    help(char *me);
 void    usage(char *me);
+void    version(char *me);
 void    printlicense();
 int     strneqstrn( const char *seek, int seeklen, const char *str, int strlen );
 void    default_opt( struct options *opt );
@@ -261,6 +262,7 @@ check_opt( struct options *opt, int argc, char *argv[] )
     int argcx;
     int askhelp    = 0;
     int asklicense = 0;
+    int askversion = 0;
     int haveenv    = 0;
     int argFEatsArg = 0;
 
@@ -329,6 +331,11 @@ check_opt( struct options *opt, int argc, char *argv[] )
                 argv[argcx], strlen(argv[argcx]) ) )
             {
                 askhelp = 1;
+            }
+            else if ( strneqstrn( "--version", strlen("--version"),
+                argv[argcx], strlen(argv[argcx]) ) )
+            {
+                askversion = 1;
             }
 #ifdef DEBUG
             else if ( strneqstrn( "--vdebug", strlen("--vdebug"),
@@ -447,6 +454,9 @@ check_opt( struct options *opt, int argc, char *argv[] )
                 }
                 else if ( 'v' == argv[argcx][cx] ) {
                     opt->debug = 1;
+                }
+                else if ( 'V' == argv[argcx][cx] ) {
+                    askversion = 1;
                 }
                 else if ( 'h' == argv[argcx][cx] ) {
                     askhelp = 1;
@@ -569,12 +579,15 @@ check_opt( struct options *opt, int argc, char *argv[] )
                 *opt->env->s?opt->env->s:"\t(none)" );
         fprintf( stderr, "       ENVADD: %s\n", opt->extra->s );
     }
-    if ( askhelp | asklicense ) {
+    if ( askhelp | asklicense | askversion ) {
         if ( askhelp ) {
             help(argv[0]);
         }
         if ( asklicense ) {
             printlicense();
+        }
+        if ( askversion ) {
+            version(argv[0]);
         }
         myexit(0);
     }
@@ -587,6 +600,17 @@ usage(char *me)
     fprintf( stderr,
         "   Usage: %s [-ePfXbS] [-F:] [ [ENVNAME] [--] ENVADD ]\n", me);
     fprintf( stderr, "For help: %s -h\n", me);
+    return;
+}
+
+void
+version(char *me)
+{
+    if ( me ) {
+        printf( "%s Version: %s\n", me, CP_VERSION );
+    } else {
+        printf( "Version: %s\n", CP_VERSION );
+    }
     return;
 }
 
@@ -692,7 +716,7 @@ help(char *me)
 #endif
 #endif
     printf( "\n" );
-    printf( "Version: %s\n", CP_VERSION );
+    version(NULL);
 #if 0
     printf( "\t(System ARG_MAX: %d)\n", ARG_MAX );
 #endif
