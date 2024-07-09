@@ -1,6 +1,17 @@
 #!/bin/bash
 #############################################################################
 ## Not auto-conf, written by hand.
+########
+#
+# If configure can't figure out your compiler, make sure it is in the
+# path AND/OR set CC=/the/full/path/to/the/compiler
+#
+# If your system has ARG_MAX defined in a file I don't know about,
+# then set HAS_ARG_MAX to the name of the file.
+#
+# If your system has the stat struct and definitons in an odd place,
+# set HAS_STAT_STRUCT=bytes/stat.h and/or HAS_STAT_DEFS.
+#
 #############################################################################
 init()
 {
@@ -310,6 +321,7 @@ init
 
 # FIRST, look for a valid compiler
 CC_CAND="${CC}"' gcc cc c89 '
+uniq CC_CAND
 stub_incl_test
 for TRY in ${CC_CAND}
 do
@@ -357,23 +369,21 @@ quietdels stub.c stub
 ########################################
 
 HDR_CANDIDATES="
+${HAS_ARG_MAX}
 linux/limits.h
 limits.h
 sys/syslimits.h
 sys/param.h
 "
+uniq HDR_CANDIDATES
 
 for TRY in ${HDR_CANDIDATES}
 do
     quietdel stub
     stub_incl_test "${TRY}" "if ( 1 < ARG_MAX ) { exit(0); }"
     cc_run_stub
-    if [ "0" = "$?" ]
-    then
-        LIMITS="${TRY}"
-        export LIMITS
-        break;
-    fi
+    ifok "$?" "LIMITS" "$TRY"
+    if [ "0" = "$?" ]; then break; fi
 done
 quietdels stub.c stub
 
@@ -390,28 +400,64 @@ fi
 ## Look for definition of struct stat and S_IF*
 ########################################
 HDR_CANDIDATES="
+${HAS_STAT_DEFS}
 sys/stat.h
 "
+uniq HDR_CANDIDATES
 
 for TRY in ${HDR_CANDIDATES}
 do
     quietdels stub.c stub
     stub_incl_test "${TRY}" "if((1<S_IFREG)&&(1<sizeof(struct stat))){exit(0);}"
     cc_run_stub
+    ifok "$?" "SYS_STAT_DEFS" "$TRY"
     if [ "0" = "$?" ]
     then
-        SYS_STAT="${TRY}"
+        BOTH_STAT=1
+        break
     fi
+    quietdels stub.c stub
+    stub_incl_test "${TRY}" "if(1<S_IFREG){exit(0);}"
+    cc_run_stub
+    ifok "$?" "SYS_STAT_DEFS" "$TRY"
 done
 quietdels stub.c stub
 
-if [ -z "$SYS_STAT" ]
+if [ -z "$SYS_STAT_DEFS" ]
 then
-    echo "Unable to locate system ARG_MAX" >&2
+    echo "Unable to locate system stat definitions (S_IFREG, etc)." >&2
     exit 1
 fi
-echo 'SYS_STAT="'${SYS_STAT}'"'
-printf "#include <${SYS_STAT}>\n" >>"${CH}"
+echo 'SYS_STAT_DEFS="'${SYS_STAT_DEFS}'"'
+printf "#include <${SYS_STAT_DEFS}>\n" >>"${CH}"
+
+if [ "1" != "$BOTH_STAT" ]
+then
+    HDR_CANDIDATES="
+    ${HAS_STAT_STRUCT}
+    sys/stat.h
+    "
+
+    for TRY in ${HDR_CANDIDATES}
+    do
+        quietdels stub.c stub
+        stub_incl_test "${TRY}" "if(1<sizeof(struct stat)){exit(0);}"
+        cc_run_stub
+        ifok "$?" "SYS_STAT" "$TRY"
+        if [ "0" = "$?" ]; then break; fi
+    done
+    quietdels stub.c stub
+
+    if [ -z "$SYS_STAT" ]
+    then
+        echo "Unable to locate system ARG_MAX" >&2
+        exit 1
+    fi
+    echo 'SYS_STAT="'${SYS_STAT}'"'
+    printf "#include <${SYS_STAT}>\n" >>"${CH}"
+fi
 
 cmk_eof
 
+# vim: ft=bash
+# EOF configure
