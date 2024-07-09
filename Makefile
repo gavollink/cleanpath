@@ -1,13 +1,6 @@
 # This will not fail if it doesn't exist, but run ./configure first.
 -include configure.mk
 
-## DEFAULTS WON'T INSTALL, set in configure.mk
-prefix:=
-bindir:=bin
-DESTDIR:=
-#############################################################################
-
-
 # If configure couldn't find ARG_MAX, this will build anyway.
 ifdef NO_ARG_MAX
 CCFLAGS+=-DNO_ARG_MAX=1
@@ -195,15 +188,6 @@ endif
 
 install: $(FINAL)
 	@if [ "/$(bindir)/" = "$(INSTALLDIR)" ]; then \
-		echo "Cannot install, prefix= and DESTDIR=, both empty." ; \
-		echo "TRY: $$ make INSTALLDIR=<path> install" ; \
-		false; \
-	elif [ "/sbin/" = "$(INSTALLDIR)" ]; then \
-		echo "Cannot install, prefix= and DESTDIR=, both empty." ; \
-		echo "TRY: $$ make INSTALLDIR=<path> install" ; \
-		false; \
-	fi
-	elif [ "/bin/" = "$(INSTALLDIR)" ]; then \
 		echo "Cannot install, prefix= and DESTDIR=, both empty." ; \
 		echo "TRY: $$ make INSTALLDIR=<path> install" ; \
 		false; \
