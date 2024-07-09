@@ -1,0 +1,417 @@
+#!/bin/bash
+#############################################################################
+## Not auto-conf, written by hand.
+#############################################################################
+init()
+{
+    CMK="configure.mk"
+    CH="configure.h"
+    quietdels "${CH}" stub stub.c
+    touch "${CH}"
+
+    if [ -r "${CMK}" ]
+    then
+        CONFIGURE_MK_EXISTS=1
+        export CONFIGURE_MK_EXISTS
+    fi
+
+    touch "${CMK}"
+}
+
+cmk_remove()
+{
+    if [ -n "$1" ]
+    then
+        REMOVE="$1"
+    fi
+    if [ -n "$2" ]
+    then
+        REPLACE="$2"
+    fi
+
+    quietdels "configure.mk.bak" "configure.mk.re1" "configure.mk.re2"
+    if [ -n "$CONFIGURE_MK_EXISTS" ]
+    then
+        #echo "grep -E '^${REMOVE}=' ${CMK}"
+        local LINE=$(grep -E "^${REMOVE}=" "${CMK}")
+        if [ -n "$LINE" ]
+        then
+            VAL=$(echo "$LINE" | sed -e "s~^${REMOVE}=~~")
+            for NEW in ${VAL}
+            do
+                if [ "$REPLACE" != "$NEW" ]
+                then
+                    FIN=" $FIN $NEW "
+                fi
+            done
+            VAL="$FIN"
+            uniq VAL
+            mv "${CMK}" "${CMK}.bak"
+            sed -e "s~^${REMOVE}=.*~${REMOVE}=${VAL}~" < configure.mk.bak >"${CMK}"
+            unset VAL
+        fi
+    fi
+    quietdels "configure.mk.bak" "configure.mk.re1" "configure.mk.re2"
+    return 0
+}
+
+cmk_append()
+{
+    if [ -n "$1" ]
+    then
+        REMOVE="$1"
+    fi
+    if [ -n "$2" ]
+    then
+        REPLACE="$2"
+    fi
+
+    quietdels "configure.mk.bak" "configure.mk.re1" "configure.mk.re2"
+    if [ -z "$CONFIGURE_MK_EXISTS" ]
+    then
+        printf '%s=%s\n' "${REMOVE}" "${REPLACE}" >>"${CMK}"
+    else
+        #echo "grep -E '^${REMOVE}=' ${CMK}"
+        #grep -E "^${REMOVE}=" "${CMK}"
+        local LINE=$(grep -E "^${REMOVE}=" "${CMK}")
+        if [ -n "$LINE" ]
+        then
+            VAL=$(echo "$LINE" | sed -e "s~^${REMOVE}=~~")
+            VAL=" $VAL $REPLACE "
+            uniq VAL
+            mv "${CMK}" "${CMK}.bak"
+            sed -e "s~^${REMOVE}=.*~${REMOVE}=${VAL}~" < configure.mk.bak >"${CMK}"
+            unset VAL
+        else
+            echo "Can't find line ${LINE}!?"
+        fi
+    fi
+    quietdels "configure.mk.bak" "configure.mk.re1" "configure.mk.re2"
+    return 0
+}
+
+cmk_replace()
+{
+    if [ -n "$1" ]
+    then
+        REMOVE="$1"
+    fi
+    if [ -n "$2" ]
+    then
+        REPLACE="$2"
+    fi
+
+    quietdels "configure.mk.bak" "configure.mk.re1" "configure.mk.re2"
+    if [ -z "$CONFIGURE_MK_EXISTS" ]
+    then
+        printf '%s=%s\n' "${REMOVE}" "${REPLACE}" >>"${CMK}"
+    else
+        mv "${CMK}" "configure.mk.bak"
+        sed -e "s~^${REMOVE}=.*~${REMOVE}=${REPLACE}~" < configure.mk.bak >"${CMK}"
+    fi
+    quietdels "configure.mk.bak" "configure.mk.re1" "configure.mk.re2"
+    return 0
+}
+
+cmk_eof()
+{
+    ########
+    ## End of configure.mk boilerplate
+    ########
+    if [ -z "${CONFIGURE_MK_EXISTS}" ]
+    then
+        printf '\n\n#########\n' >>"${CMK}"
+        printf '## User Configurable Values\n' >>"${CMK}"
+        printf '#########\n\n' >>"${CMK}"
+
+        printf "# If a prefix isn't set, make won't install\n" >>"${CMK}"
+        printf 'prefix=\n' >>"${CMK}"
+        printf 'bindir=bin\n\n' >>"${CMK}"
+
+        printf "# Do Not Set Here, for reference only:\n" >>"${CMK}"
+        printf '# INSTALLDIR=$(DESTDIR)/$(prefix)/$(bindir)/\n\n' >>"${CMK}"
+
+        printf "# NOTE: DESTDIR is typically reserved for package\n" >>"${CMK}"
+        printf "#       managers or chroot environment setups.\n\n" >>"${CMK}"
+
+        printf '# MacOS - Set a code signing signature name here.\n' >>"${CMK}"
+        printf '# SIGNID=CompanyName Releases\n' >>"${CMK}"
+        printf 'SIGNID=\n' >>"${CMK}"
+        printf '# MacOS/Sign - If signature is in a non-standard keychain:\n' >>"${CMK}"
+        printf '# CHAIN=Offline.keychain-db\n' >>"${CMK}"
+        printf 'CHAIN=\n\n' >>"${CMK}"
+
+        printf "# vim: ft=make\n" >>"${CMK}"
+        printf "# EOF ${CMK}\n" >>"${CMK}"
+    fi
+    return 0
+}
+
+uniq()
+{
+    LISTIN="$1"
+    LIST=$(eval echo '$'"$LISTIN")
+    LIST2=''
+    for A in $LIST
+    do
+        FOUND=0
+        for B in $LIST2
+        do
+            if [ "$A" = "$B" ]
+            then
+                FOUND=1
+            fi
+        done
+        if [ "0" = "$FOUND" ]
+        then
+            if [ -n "$LIST2" ]
+            then
+                LIST2="$LIST2 $A"
+            else
+                LIST2="$A"
+            fi
+        fi
+    done
+    unset "$LISTIN"
+    if [ -n "$LIST2" ]
+    then
+        eval "$LISTIN"'="'"$LIST2"'"'
+        export $LISTIN
+    fi
+}
+
+ifokappend()
+{
+    if [ "0" != "$1" ]
+    then
+        return "$1"
+    fi
+    if [ -z "$2" ]
+    then
+        return 2
+    fi
+    if [ -z "$3" ]
+    then
+        return 3
+    fi
+    local CHK=$(eval echo '$'"$2")
+    if [ -n "$CHK" ]
+    then
+        eval "$2"'="'"$CHK ""$3"'"'
+    else
+        eval "$2"'="'"$3"'"'
+    fi
+    export "$2"
+    return 0
+}
+
+ifok()
+{
+    if [ "0" != "$1" ]
+    then
+        return "$1"
+    fi
+    if [ -z "$2" ]
+    then
+        return 2
+    fi
+    if [ -z "$3" ]
+    then
+        return 3
+    fi
+    eval "$2"'="'"$3"'"'
+    export "$2"
+    return 0
+}
+
+stub_incl_test()
+{
+    quietdel stub.c
+    printf "#include <stdio.h>\n" >stub.c
+    printf "#include <stdlib.h>\n" >>stub.c
+    if [ -n "$1" ]
+    then
+        printf "#include <%s>\n" "$1" >>stub.c
+    fi
+    printf "\nint main() {\n" >>stub.c
+    if [ -n "$2" ]
+    then
+        printf "\t%s\n" "$2" >>stub.c
+    else
+        printf "\tint x = 4; int y = 3;\n" >>stub.c
+        printf "\tif ( 7 == ( x + y ) ) {\n" >>stub.c
+        printf "\t\texit(0);\n" >>stub.c
+        printf "\t}\n" >>stub.c
+    fi
+    printf "\texit(1);\n" >>stub.c
+    printf "}\n" >>stub.c
+}
+
+cc_run_stub()
+{
+    if [ -z "${_CC}" ]
+    then
+        local _CC="${CC}"
+    fi
+    if [ -z "${_CCFLAGS}" ]
+    then
+        local _CCFLAGS="${FINAL_CCFLAGS}"
+    fi
+    quietdel stub
+    #echo "${_CC}" ${_CCFLAGS} -o stub stub.c
+    #"${_CC}" ${_CCFLAGS} -o stub stub.c
+    "${_CC}" ${_CCFLAGS} -o stub stub.c >/dev/null 2>&1
+    if [ "$?" = "0" -a -x "stub" ]
+    then
+        ./stub
+        if [ "$?" = "0" ]
+        then
+            #echo "SUCCESS ${_CC}" ${_CCFLAGS} -o stub stub.c
+            return 0
+        fi
+        #echo "stub return $?"
+        return 1
+    fi
+    #cat stub.c
+    #echo "${_CC}" ${_CCFLAGS} -o stub stub.c
+    #echo "$_CC return $?"
+    return 1
+}
+
+quietdels()
+{
+    for X in $@
+    do
+        quietdel "$X"
+    done
+}
+
+quietdel()
+{
+    if [ -n "$1" ]
+    then
+        DF="$1"
+        if [ "/" = "$DF" ]
+        then
+            return 1
+        fi
+        if [ -d "$DF" ]
+        then
+            rm -rf "$DF" 2>&1 >/dev/null
+        elif [ -e "$DF" ]
+        then
+            rm -f "$DF" 2>&1 >/dev/null
+        fi
+    fi
+    return 0
+}
+
+init
+
+# FIRST, look for a valid compiler
+CC_CAND="${CC}"' gcc cc c89 '
+stub_incl_test
+for TRY in ${CC_CAND}
+do
+    _CC="${TRY}" cc_run_stub
+    ifok "$?" "CC" "$TRY"
+    if [ "0" = "$?" ]; then break; fi
+done
+unset _CC
+quietdel stub
+
+if [ -z "$CC" ]
+then
+    echo "Unable to find a working compiler (set env CC if you have one)" >&2
+    echo "Tried: [ ${CC_CAND} ]" >&2
+    exit 1
+fi
+if [ -z "${CONFIGURE_MK_EXISTS}" ]
+then
+    printf '# Usable CC\n' >>"${CMK}"
+fi
+echo 'CC="'$CC'"'
+cmk_replace "CC" "$CC" >>"${CMK}"
+
+########################################
+## Look for CC capabilities to run options.
+########################################
+for _CCFLAGS in -g -O2 -Wall -std=gnu99 $CCFLAGS
+do
+    cc_run_stub
+    ifokappend "$?" FINAL_CCFLAGS "$_CCFLAGS"
+    if [ "0" != "$?" ]
+    then
+        cmk_remove CCFLAGS "$_CCFLAGS"
+    fi
+done
+unset _CCFLAGS
+quietdel stub
+printf 'CCFLAGS=%s\n' "${FINAL_CCFLAGS}"
+cmk_append "CCFLAGS" "${FINAL_CCFLAGS}"
+
+quietdels stub.c stub
+
+########################################
+## Look for definition of ARG_MAX
+########################################
+
+HDR_CANDIDATES="
+linux/limits.h
+limits.h
+sys/syslimits.h
+sys/param.h
+"
+
+for TRY in ${HDR_CANDIDATES}
+do
+    quietdel stub
+    stub_incl_test "${TRY}" "if ( 1 < ARG_MAX ) { exit(0); }"
+    cc_run_stub
+    if [ "0" = "$?" ]
+    then
+        LIMITS="${TRY}"
+        export LIMITS
+        break;
+    fi
+done
+quietdels stub.c stub
+
+if [ -z "$LIMITS" ]
+then
+    printf "NO_ARG_MAX=1" >>"${CMK}"
+else
+    echo 'LIMITS="'${LIMITS}'"'
+    printf "#include <${LIMITS}>\n" >>"${CH}"
+fi
+
+
+########################################
+## Look for definition of struct stat and S_IF*
+########################################
+HDR_CANDIDATES="
+sys/stat.h
+"
+
+for TRY in ${HDR_CANDIDATES}
+do
+    quietdels stub.c stub
+    stub_incl_test "${TRY}" "if((1<S_IFREG)&&(1<sizeof(struct stat))){exit(0);}"
+    cc_run_stub
+    if [ "0" = "$?" ]
+    then
+        SYS_STAT="${TRY}"
+    fi
+done
+quietdels stub.c stub
+
+if [ -z "$SYS_STAT" ]
+then
+    echo "Unable to locate system ARG_MAX" >&2
+    exit 1
+fi
+echo 'SYS_STAT="'${SYS_STAT}'"'
+printf "#include <${SYS_STAT}>\n" >>"${CH}"
+
+cmk_eof
+

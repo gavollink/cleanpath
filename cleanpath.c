@@ -5,7 +5,7 @@
  *
  * LICENSE: Embedded at bottom...
  */
-#define CP_VERSION "1.07"
+#define CP_VERSION "1.10a"
 
 #include <stdio.h>          // printf
 #include <stdlib.h>         // exit, malloc, free
@@ -14,29 +14,8 @@
 #include <string.h>
 // stat()
 #include <sys/types.h>
-#include <sys/stat.h>
 #include <unistd.h>
-#ifdef __linux__
-#   include <bits/stat.h>
-#endif
-#if 0
-// ARG_MAX
-#ifdef __MACH__
-    // MacOS file is here
-#include <sys/syslimits.h>
-#elif defined (__hpux)
-    // HP/UX file /may/ be here
-#include <sys/param.h>
-    // or here
-#include <limits.h>
-#elif defined (__linux__)
-#include <linux/limits.h>
-    // Add More, If you have them
-#else
-    // Something on the internet suggested that this covers Solaris
-#include <limits.h>
-#endif
-#endif
+#include "configure.h"
 
 #include "bstr.h"
 
@@ -46,7 +25,7 @@ struct options {
     int     dir;
     int     before;
     int     debug;
-#if 0
+#ifndef NO_ARG_MAX
     int     sizewarn;
 #endif
     char    delimiter;
@@ -315,7 +294,7 @@ check_opt( struct options *opt, int argc, char *argv[] )
                 }
                 haveenv = 1;
             }
-#if 0
+#ifndef NO_ARG_MAX
             else if ( strneqstrn( "--nosizelimit", strlen("--nosizelimit"),
                         argv[argcx], strlen(argv[argcx]) ) )
             {
@@ -440,7 +419,7 @@ check_opt( struct options *opt, int argc, char *argv[] )
                 else if ( 'b' == argv[argcx][cx] ) {
                     set_before( opt, "-b", 1 );
                 }
-#if 0
+#ifndef NO_ARG_MAX
                 else if ( 'S' == argv[argcx][cx] ) {
                     opt->sizewarn = 0;
                 }
@@ -572,7 +551,7 @@ check_opt( struct options *opt, int argc, char *argv[] )
         fprintf( stderr, " --checkfiles: %d\n", opt->file );
         fprintf( stderr, "  --delimiter:'%c'\n", opt->delimiter );
         fprintf( stderr, "     --before: %d\n", opt->before );
-#if 0
+#ifndef NO_ARG_MAX
         fprintf( stderr, "--nosizelimit: %d\n", !opt->sizewarn );
 #endif
         fprintf( stderr, "      ENVNAME: %s\n",
@@ -684,7 +663,7 @@ help(char *me)
     printf( "\t\t%s\n",
                 "Extra data to add to ENV for output." );
     printf( "\n" );
-#if 0
+#ifndef NO_ARG_MAX
     printf( "\t%s\n",
         "--nosizelimit | -S" );
     printf( "\t\t%s\n",
@@ -706,22 +685,19 @@ help(char *me)
         "--debug | -v" );
     printf( "\t\t%s\n",
                 "Enable debugging output." );
-#if 0
-    /* Deliberately hiding --vdebug, even if it's enabled */
 #ifdef DEBUG
     printf( "\t%s\n",
         "--vdebug" );
     printf( "\t\t%s\n",
                 "Enable dev debugging output." );
 #endif
-#endif
     printf( "\n" );
     version(NULL);
-#if 0
+#ifndef NO_ARG_MAX
     printf( "\t(System ARG_MAX: %d)\n", ARG_MAX );
 #endif
     printf( "\n" );
-    printf( "Copyright (c) 2021, 2023 Gary Allen Vollink -- MIT License\n" );
+    printf( "Copyright (c) 2021-2024 by Gary Allen Vollink -- MIT License\n" );
     return;
 }
 
@@ -773,7 +749,7 @@ default_opt( struct options *opt )
     opt->dir       = 0;
     opt->before    = 0;
     opt->debug     = 0;
-#if 0
+#ifndef NO_ARG_MAX
     opt->sizewarn  = 1;
 #endif
     opt->delimiter = ':';
