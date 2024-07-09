@@ -167,7 +167,7 @@ keychain-unlock: macos-keychain-unlock
 	@echo "running script macos-keychain-unlock (SIGNID is set)"
 	@./macos-keychain-unlock
 
-macos-keychain-unlock: mk.skel
+macos-keychain-unlock: Makefile
 	@printf '#!/bin/bash\n' > macos-keychain-unlock
 	@printf '\n_NEED_UNLOCK=1\n' >> macos-keychain-unlock
 	@printf 'CK=`date -v-3m +"%%s"`\n' >> macos-keychain-unlock
