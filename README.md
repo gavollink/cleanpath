@@ -12,6 +12,10 @@ I want a common .profile across systems.  However, not all systems have
 the same things installed.  I inherit some stuff from the system itself, so
 I want to keep whatever that is.
 
+## Code Home
+
+    Primary Development: https://gitlab.home.vollink.com/external/cleanpath
+    Backup Location:     https://github.com/gavollink/cleanpath
 
 ### Most Common Way
 
