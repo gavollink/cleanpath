@@ -1,5 +1,11 @@
-# This will not fail if it doesn't exist, but run ./configure first.
--include configure.mk
+# This will not fail if it doesn't exist.
+# Because 'configure.mk' is a dependency for the build targets,
+# it will be made and included there, but it will NOT be made
+# when clean is run.
+# The '-' keeps it from being fatal, but also, the '*' keeps it
+# ambiguous, so that GNU make won't just build it every time,
+# without an explicit need.
+-include configure.mk*
 
 # If configure couldn't find ARG_MAX, this will build anyway.
 ifdef NO_ARG_MAX
@@ -16,7 +22,7 @@ INSTALLDIR=$(shell echo "$(_INSTALLDIR)" | sed -e 's@//*@/@g')
 
 FINAL=cleanpath
 SOURCE=bstr.c cleanpath.c
-X_DEPS=Makefile configure.mk configure.h bstr.h
+X_DEPS=bstr.h Makefile configure.h configure.mk
 
 # Linux or Darwin (probably), Darwin is the one I treat differently
 SYS=$(shell uname -s)
@@ -147,19 +153,24 @@ else
 	$(CC) $(CCFLAGS) -c $< -o $@
 endif
 
-configure.mk configure.h: configure
+# The one command makes or rebuilds both
+configure.h configure.mk: configure
 	./configure
 
+# macOS ONLY Target no-keychain
 no-keychain:
 	-@if [ -e ./.keychain-unlock ]; then rm ./.keychain-unlock; fi
 	@echo "####################################################################"
 	@echo "#### macOS, SIGNID not set, will not attempt to codesign $(FINAL)"
 	@echo "####################################################################"
 
+# macOS ONLY Target keychain-unlock
 keychain-unlock: macos-keychain-unlock
 	@echo "running script macos-keychain-unlock (SIGNID is set)"
 	@./macos-keychain-unlock
 
+# macOS ONLY Target macos-keychain-unlock
+# This builds a script that will ONLY WORK ON macOS!
 macos-keychain-unlock: Makefile
 	@printf '#!/bin/bash\n' > macos-keychain-unlock
 	@printf '\n_NEED_UNLOCK=1\n' >> macos-keychain-unlock
@@ -186,7 +197,7 @@ endif
 	chmod a+x macos-keychain-unlock
 
 
-install: $(FINAL)
+install: $(FINAL) configure.mk
 	@if [ "/$(bindir)/" = "$(INSTALLDIR)" ]; then \
 		echo "Cannot install, prefix= and DESTDIR=, both empty." ; \
 		echo "TRY: $$ make INSTALLDIR=<path> install" ; \
@@ -209,8 +220,8 @@ clean:
 	-rm -f *.$(FINAL)
 
 dist-clean distclean: clean
-	-rm -f "configure.h"
 	-rm -f $(FINAL)
+	-rm -f "configure.h"
 	@if [ -e "configure.mk" ]; then \
 		echo "##############################################################"; \
 		echo "#### configure.mk exists, remove manually..."; \
