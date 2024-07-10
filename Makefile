@@ -1,11 +1,9 @@
-# This will not fail if it doesn't exist.
-# Because 'configure.mk' is a dependency for the build targets,
-# it will be made and included there, but it will NOT be made
-# when clean is run.
-# The '-' keeps it from being fatal, but also, the '*' keeps it
-# ambiguous, so that GNU make won't just build it every time,
-# without an explicit need.
--include configure.mk*
+# This include comes from `./configure`
+## NOTE: make will run configure if it isn't there, that's weird
+# because if we run `make distclean` twice in a raw, the secdond time,
+# it will run ./configure BEFORE it immediately deletes the resulting
+# files.
+include configure.mk
 
 # If configure couldn't find ARG_MAX, this will build anyway.
 ifdef NO_ARG_MAX
@@ -155,7 +153,14 @@ endif
 
 # The one command makes or rebuilds both
 configure.h configure.mk: configure
+	@echo "########################################"
+	@echo "## No $@ exists..."
+	@echo "## Running:  configure"
+	@echo "########################################"
 	./configure
+	@echo "########################################"
+	@echo "## configure done."
+	@echo "########################################"
 
 # macOS ONLY Target no-keychain
 no-keychain:
@@ -222,12 +227,32 @@ clean:
 dist-clean distclean: clean
 	-rm -f $(FINAL)
 	-rm -f "configure.h"
-	@if [ -e "configure.mk" ]; then \
+	@if [ -n "$(SIGNID)" ]; then \
 		echo "##############################################################"; \
-		echo "#### configure.mk exists, remove manually..."; \
+		echo "#### configure.mk exists, AND WAS MODIFIED remove manually..."; \
 		echo "#### rm configure.mk"; \
 		echo "##############################################################"; \
+		false; \
+	elif [ -n "$(CHAIN)" ]; then \
+		echo "##############################################################"; \
+		echo "#### configure.mk exists, AND WAS MODIFIED remove manually..."; \
+		echo "#### rm configure.mk"; \
+		echo "##############################################################"; \
+		false; \
+	elif [ -n "$(prefix)" ]; then \
+		echo "##############################################################"; \
+		echo "#### configure.mk exists, AND WAS MODIFIED remove manually..."; \
+		echo "#### rm configure.mk"; \
+		echo "##############################################################"; \
+		false; \
+	elif [ "bin" != "$(bindir)" ]; then \
+		echo "##############################################################"; \
+		echo "#### configure.mk exists, AND WAS MODIFIED remove manually..."; \
+		echo "#### rm configure.mk"; \
+		echo "##############################################################"; \
+		false; \
 	fi
+	rm -f configure.mk
 
 # FROM WIKIPEDIA...
 #

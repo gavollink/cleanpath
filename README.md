@@ -80,23 +80,44 @@ verify it actually exists on the system.
 - cleanpath -b puts the command line parameters before the PATH environment
 variable in the output.
 
-## Build...
+## Build (part 1)
 
 Should work on any UNIX, though MacOS and Linux have been tested
-(check [bottom](#compile-on-unix) of this README for more details).
+(check [bottom](#compile-on-unix) of this README for more).
 
-If 'make' is installed, adjust compile options in the Makefile 
-and type make
+    ./configure
+
+**NOTE:** The configure script is not GNU-autoconf.
+There are very few things this needs that aren't extremely
+standard across UNIX, so the ./configure is hand-written.
+configure outputs to configure.h and configure.mk
+
+### On macOS only...
+
+Compiling on any macOS since Yosemite (10.10), make will automatically
+build a Universal `arm64 & x86_64` binary.
+
+Older than that, and it will just do the compile with no special
+targetting, like it does for any other Linux.
+
+IF your mac is set up so that you MUST do local codesign before you
+can run self-compiled command line tools, then edit the 'configure.mk'
+file that the ./configure command produced.  SIGNID= and CHAIN= can
+be set to get the Makefile to initiate that as part of the build.
+
+## Build (part 2)
 
     make
 
-or
+This should build without warnings.
 
-    cc -o cleanpath cleanpath.c bstr.c
+## Install
 
-or
+There's only the one executable, copy it where you want?
 
-    gcc -Wall -O2 -o cleanpath cleanpath.c bstr.c
+BUT, uh, configure.mk CAN be edited to put in values for prefix
+and bindir, and if those are set then `make install` will do that
+one thing.
 
 ## Non-obvious features
 
@@ -163,7 +184,7 @@ As shown in the examples above, short options can be bundled `-PbF-`
         Verify that each --delimiter separated token is a valid directory.
     --checkfiles
     -f
-        Verify that each --delimiter separated token is a valid directory.
+        Verify that each --delimiter separated token is a valid file.
     --delimiter :
     -F:
         Single character delimiter for tokens both for output and inputs
@@ -194,8 +215,8 @@ As shown in the examples above, short options can be bundled `-PbF-`
     --license
         Print the LICENSE.
     --vdebug
-        This isn't in --help, it's super verbose and only useful for debugging
-        changes to this program itself.
+        Super verbose and only useful for debugging
+        changes to this program itself.  Only available if compiled in.
 
 ## Cautions
 
@@ -208,8 +229,11 @@ environment variable.
 
 ## TODO
 
-I'm thinking about an elegant way to deal with LD_FLAGS settings... where
-' -L' precedes the folder to verify.  Or CC_FLAGS where a ' -I' precedes
+I think the string-hanlding should be replaced with something more
+standard than the home-grown thing I'm using.
+
+I'm thinking about an elegant way to deal with `LD_FLAGS` settings... where
+' -L' precedes the folder to verify.  Or `CC_FLAGS` where a ' -I' precedes
 a directory.  There are a few places in my workflow where this would
 come in handy.
 
@@ -227,22 +251,16 @@ Reach out with requests.
 
 Some options do not have short alternatives.
 I set short options for everything that might be required in scripted use.
-Not for `--env` because ENVNAME default to the first bareword.
+Not for `--env` because ENVNAME defaults to the first bareword.
 
 There are MANY features I could add, but this does what I need it to do 
 in just less that 1400 lines of C.
 
 ## Compile on UNIX
 
-This section used to have a discussion about which Header file ARG_MAX
-might be hidden in on various UNIX systems, but I removed the dependency 
-on needing to know.  First, I dynamically grow strings for the data being
-added.  Second, I removed a feature that used it.  Previous versions
-of this program would truncate the output to ARG_MAX unless told otherwise.
-It's exceedingly rare to run into that limit anyway, so I dropped it.
-
 I am curious to know if anybody 
-compiles this on another UNIX or a CPU other than x86 or armhf (Pi).
-Also, this is a low traffic site, I can probably help if you have issues.
+compiles this on another UNIX or a CPU other than x86, M1 (arm64) or
+one of the Raspberry Pis (armhf, armv7l, aarch64).
+Also, this is a low traffic project, I can probably help if you have issues.
 
     firstname @ lastname . com
