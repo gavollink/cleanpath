@@ -216,7 +216,6 @@ dist-clean distclean: clean
 		echo "#### configure.mk exists, remove manually..."; \
 		echo "#### rm configure.mk"; \
 		echo "##############################################################"; \
-		false; \
 	fi
 
 # FROM WIKIPEDIA...
