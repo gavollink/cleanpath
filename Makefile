@@ -163,7 +163,7 @@ keychain-unlock: macos-keychain-unlock
 macos-keychain-unlock: Makefile
 	@printf '#!/bin/bash\n' > macos-keychain-unlock
 	@printf '\n_NEED_UNLOCK=1\n' >> macos-keychain-unlock
-	@printf 'CK=`date -v-3m +"%%s"`\n' >> macos-keychain-unlock
+	@printf 'CK=`date -v-3M +"%%s"`\n' >> macos-keychain-unlock
 	@printf 'if [ -e './.keychain-unlock' ]\n' >> macos-keychain-unlock
 	@printf 'then\n' >> macos-keychain-unlock
 	@printf '    TS=`stat -f"%%m" ./.keychain-unlock`\n' >> macos-keychain-unlock
